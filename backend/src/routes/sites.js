@@ -1,0 +1,139 @@
+const express = require('express');
+const router = express.Router();
+const siteController = require('../controllers/siteController');
+const {
+  getPayments, createPayment, updatePayment, deletePayment
+} = require('../controllers/paymentController');
+const {
+  getInstallments, createInstallment, updateInstallment, deleteInstallment
+} = require('../controllers/installmentController');
+const {
+  getWorkers, createWorker, updateWorker, deleteWorker
+} = require('../controllers/workerController');
+const {
+  getWorkerPayments, createWorkerPayment, updateWorkerPayment, deleteWorkerPayment
+} = require('../controllers/workerPaymentController');
+const {
+  getMaterials, createMaterial, updateMaterial, deleteMaterial
+} = require('../controllers/materialController');
+const {
+  getVendors, createVendor, updateVendor, deleteVendor
+} = require('../controllers/vendorController');
+const {
+  getVendorPayments, createVendorPayment, deleteVendorPayment
+} = require('../controllers/vendorPaymentController');
+const {
+  getExpenses, createExpense, updateExpense, deleteExpense
+} = require('../controllers/expenseController');
+const {
+  getActivities, createActivity, updateActivity, deleteActivity, updateProgress
+} = require('../controllers/activityController');
+const {
+  getDocuments, uploadDocument, deleteDocument, getDocumentFile
+} = require('../controllers/documentController');
+const reportController = require('../controllers/reportController');
+const { auth } = require('../middleware/auth');
+const { loadSite } = require('../middleware/siteAccess');
+const { uploadSingle } = require('../middleware/fileUpload');
+
+// All routes require authentication
+router.use(auth);
+
+// MULTI-TENANT GUARD
+// Every route below that declares ':siteId' first runs loadSite(), which
+// verifies the site belongs to the authenticated engineer (404 otherwise) and
+// exposes it as req.site. This means nested resources such as
+// '/:siteId/payments' can never leak across engineers.
+router.param('siteId', loadSite);
+
+// IMPORTANT: static/specific paths must be declared BEFORE '/:siteId'
+// otherwise Express would match 'summary' as a site id.
+
+// Site routes
+router.get('/', siteController.getSites);
+router.post('/', siteController.createSite);
+router.get('/summary', siteController.getSiteSummary);
+router.get('/latest', siteController.getLatestSite);
+
+// Site by ID routes
+router.get('/:siteId', siteController.getSite);
+router.put('/:siteId', siteController.updateSite);
+router.delete('/:siteId', siteController.deleteSite);
+router.get('/:siteId/summary', siteController.getSiteSummary);
+router.patch('/:siteId/archive', siteController.archiveSite);
+router.patch('/:siteId/complete', siteController.completeSite);
+
+// Progress
+router.put('/:siteId/progress', updateProgress);
+// Alias: the Overview tab's quick control posts an explicit percentage, and
+// PATCH is the natural verb for that partial update.
+router.patch('/:siteId/progress', updateProgress);
+
+// Payments
+router.get('/:siteId/payments', getPayments);
+router.post('/:siteId/payments', createPayment);
+router.put('/:siteId/payments/:id', updatePayment);
+router.delete('/:siteId/payments/:id', deletePayment);
+
+// Installments
+router.get('/:siteId/installments', getInstallments);
+router.post('/:siteId/installments', createInstallment);
+router.put('/:siteId/installments/:id', updateInstallment);
+router.delete('/:siteId/installments/:id', deleteInstallment);
+
+// Worker payments -- declared BEFORE '/:siteId/workers/:id' so that
+// PUT '/:siteId/workers/payments' is not swallowed by the ':id' route.
+router.get('/:siteId/worker-payments', getWorkerPayments);
+router.post('/:siteId/worker-payments', createWorkerPayment);
+router.put('/:siteId/worker-payments/:id', updateWorkerPayment);
+router.delete('/:siteId/worker-payments/:id', deleteWorkerPayment);
+
+// Workers
+router.get('/:siteId/workers', getWorkers);
+router.post('/:siteId/workers', createWorker);
+router.put('/:siteId/workers/:id', updateWorker);
+router.delete('/:siteId/workers/:id', deleteWorker);
+
+// Materials
+router.get('/:siteId/materials', getMaterials);
+router.post('/:siteId/materials', createMaterial);
+router.put('/:siteId/materials/:id', updateMaterial);
+router.delete('/:siteId/materials/:id', deleteMaterial);
+
+// Vendor payments -- declared BEFORE '/:siteId/vendors/:id' (same reason as above)
+router.get('/:siteId/vendor-payments', getVendorPayments);
+router.post('/:siteId/vendor-payments', createVendorPayment);
+router.delete('/:siteId/vendor-payments/:id', deleteVendorPayment);
+
+// Vendors
+router.get('/:siteId/vendors', getVendors);
+router.post('/:siteId/vendors', createVendor);
+router.put('/:siteId/vendors/:id', updateVendor);
+router.delete('/:siteId/vendors/:id', deleteVendor);
+
+// Expenses
+router.get('/:siteId/expenses', getExpenses);
+router.post('/:siteId/expenses', createExpense);
+router.put('/:siteId/expenses/:id', updateExpense);
+router.delete('/:siteId/expenses/:id', deleteExpense);
+
+// Activities
+router.get('/:siteId/activities', getActivities);
+router.post('/:siteId/activities', createActivity);
+router.put('/:siteId/activities/:id', updateActivity);
+router.delete('/:siteId/activities/:id', deleteActivity);
+
+// Documents
+router.get('/:siteId/documents', getDocuments);
+router.post('/:siteId/documents', uploadSingle, uploadDocument);
+router.get('/:siteId/documents/:id/download', getDocumentFile);
+router.delete('/:siteId/documents/:id', deleteDocument);
+
+// Reports & exports
+router.get('/:siteId/reports', reportController.getReports);
+router.get('/:siteId/report/pdf', reportController.getSitePdfReport);
+router.get('/:siteId/export/excel', reportController.exportExcel);
+router.get('/:siteId/export/csv', reportController.exportCsv);
+
+module.exports = router;
+

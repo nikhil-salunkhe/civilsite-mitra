@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Uploaded user files
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Scratch files
+*.txt
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
