@@ -11,19 +11,35 @@ export const EngineersList = () => {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({});
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [sort, setSort] = useState('createdAt-desc');
   const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Any filter change resets to page 1 so users never land on a stale empty page.
+  const applyFilter = (setter) => (value) => { setPage(1); setter(value); };
+
   const fetchEngineers = async () => {
     try {
-      const { data } = await api.get('/admin/engineers', { params: { page, limit: 10, search: search || undefined, status: status || undefined } });
+      const [sortBy, sortOrder] = sort.split('-');
+      const { data } = await api.get('/admin/engineers', {
+        params: {
+          page, limit: 10,
+          search: search || undefined,
+          status: status || undefined,
+          from: from || undefined,
+          to: to || undefined,
+          sortBy, sortOrder,
+        },
+      });
       setEngineers(data.data.engineers);
       setPagination(data.data.pagination);
     } catch { toast.error('Failed to load engineers'); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchEngineers(); }, [page, search, status]);
+  useEffect(() => { fetchEngineers(); }, [page, search, status, from, to, sort]);
 
   const handleStatusChange = async (id, newStatus) => {
     try {
@@ -54,14 +70,25 @@ export const EngineersList = () => {
         </button>
       } />
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, email, mobile..." className="flex-1" />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="select w-full sm:w-48">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <SearchInput value={search} onChange={applyFilter(setSearch)} placeholder="Search by name, email, mobile..." className="flex-1" />
+        <select value={status} onChange={(e) => applyFilter(setStatus)(e.target.value)} className="select w-full lg:w-44">
           <option value="">All Status</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
           <option value="BLOCKED">Blocked</option>
           <option value="INACTIVE">Inactive</option>
+        </select>
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={(e) => applyFilter(setFrom)(e.target.value)} className="input w-40" aria-label="Created from" />
+          <span className="text-sm text-gray-500">to</span>
+          <input type="date" value={to} onChange={(e) => applyFilter(setTo)(e.target.value)} className="input w-40" aria-label="Created to" />
+        </div>
+        <select value={sort} onChange={(e) => applyFilter(setSort)(e.target.value)} className="select w-full lg:w-48">
+          <option value="createdAt-desc">Newest First</option>
+          <option value="createdAt-asc">Oldest First</option>
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
         </select>
       </div>
 

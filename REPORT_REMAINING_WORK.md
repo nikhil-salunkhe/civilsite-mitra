@@ -11,8 +11,8 @@
 
 | Metric | Before this package | After this package |
 |---|---|---|
-| End-to-end checks executed | 20 | **100** |
-| End-to-end checks passing | 20 / 20 | **100 / 100 (exit 0)** |
+| End-to-end checks executed | 20 | **104** |
+| End-to-end checks passing | 20 / 20 | **104 / 104 (exit 0)** |
 | Site-dashboard tabs covered by E2E | 0 of 10 | **10 of 10** |
 | Unwired features (backend endpoint with no UI, or UI with no endpoint) | 4 | **0** |
 | Frontend production build | exit 0 | **exit 0** (918 modules) |
@@ -278,5 +278,5 @@ These are **not** blockers — every phase of this package is verified working �
 
 ---
 
-*Report generated after the final verification run: backend syntax 0 failures · frontend build exit 0 (918 modules) · E2E 100 passed / 0 failed (exit 0) · API, web and proxy all HTTP 200 · database left clean (0 test leftovers) · initial git commit created.*
+*Report generated after the final verification run: backend syntax 0 failures · frontend build exit 0 (918 modules) · E2E 104 passed / 0 failed (exit 0) · API, web and proxy all HTTP 200 · database left clean (0 test leftovers) · initial git commit created.*
 

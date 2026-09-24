@@ -16,8 +16,10 @@ export const AdminLayout = () => {
   const navItems = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '🏠' },
     { path: '/admin/engineers', label: 'Engineers', icon: '👷' },
+    { path: '/admin/engineers/create', label: 'Add Engineer', icon: '➕' },
     { path: '/admin/sites', label: 'All Sites', icon: '🏗️' },
     { path: '/admin/reports', label: 'Reports', icon: '📊' },
+    { path: '/admin/analytics', label: 'Analytics', icon: '📈' },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
     { path: '/admin/profile', label: 'My Profile', icon: '👤' },
     { path: '/admin/settings', label: 'Settings', icon: '⚙️' },

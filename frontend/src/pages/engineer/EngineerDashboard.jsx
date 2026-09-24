@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { PageHeader, StatusBadge } from '../../components/UI';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
 
@@ -29,6 +29,29 @@ export const EngineerDashboard = () => {
     { name: 'On Hold', value: data?.stats?.onHold || 0, color: COLORS[2] },
     { name: 'Planned', value: data?.stats?.planned || 0, color: COLORS[3] },
   ] : [];
+
+  // Spec section 9 chart series - visualized only; all numbers come from the
+  // backend financial service via /sites/summary (never recomputed here).
+  const fin = data?.financials || {};
+  const investmentChart = [
+    { name: 'Materials', value: fin.materialCost || 0, color: '#3b82f6' },
+    { name: 'Workers', value: fin.workerCost || 0, color: '#f59e0b' },
+    { name: 'Vendors', value: fin.vendorCost || 0, color: '#8b5cf6' },
+    { name: 'Other', value: fin.otherExpenses || 0, color: '#6b7280' },
+  ].filter((x) => x.value > 0);
+  const paymentChart = [
+    { name: 'Received', value: fin.totalReceived || 0, color: '#22c55e' },
+    { name: 'Pending', value: fin.pendingReceivable || 0, color: '#ef4444' },
+  ].filter((x) => x.value > 0);
+  const profitChart = [
+    { name: 'Value', value: fin.projectValue || 0 },
+    { name: 'Investment', value: fin.totalInvestment || 0 },
+    { name: 'Profit', value: fin.estimatedProfit || 0 },
+  ];
+  const progressChart = (fin.sites || data?.sites || []).slice(0, 6).map((s) => ({
+    name: String(s.siteName || '').slice(0, 12),
+    progress: s.overallProgress || 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -56,6 +79,93 @@ export const EngineerDashboard = () => {
           { label: 'Pending Payments', value: f(data?.financials?.pendingReceivable), color: 'border-l-4 border-l-danger-500' },
           { label: 'Estimated Profit', value: f(data?.financials?.estimatedProfit), color: 'border-l-4 border-l-secondary-500' },
         ].map((item, i) => <div key={i} className={`dashboard-card ${item.color}`}><p className="text-sm text-gray-500 mb-1">{item.label}</p><p className="text-xl font-bold">{item.value}</p></div>)}
+      </div>
+
+      {/* Spec section 9: Investment, Payment Status, Profit Overview, Site Progress */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card">
+          <h3 className="card-title mb-3">Investment Breakdown</h3>
+          {investmentChart.length ? (
+            <React.Fragment>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={investmentChart} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value">
+                      {investmentChart.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip formatter={(v) => f(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3 mt-2 text-xs">
+                {investmentChart.map((c) => (
+                  <div key={c.name} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }}></div>
+                    {c.name}: {f(c.value)}
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          ) : <div className="h-52 flex items-center justify-center text-gray-400">No investment recorded yet</div>}
+        </div>
+
+        <div className="card">
+          <h3 className="card-title mb-3">Payment Status</h3>
+          {paymentChart.length ? (
+            <React.Fragment>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={paymentChart} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value">
+                      {paymentChart.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip formatter={(v) => f(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3 mt-2 text-xs">
+                {paymentChart.map((c) => (
+                  <div key={c.name} className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }}></div>
+                    {c.name}: {f(c.value)}
+                  </div>
+                ))}
+              </div>
+            </React.Fragment>
+          ) : <div className="h-52 flex items-center justify-center text-gray-400">No payments recorded yet</div>}
+        </div>
+
+        <div className="card">
+          <h3 className="card-title mb-3">Profit Overview</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={profitChart}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(v) => new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(v)} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => f(v)} />
+                <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 className="card-title mb-3">Site Progress</h3>
+          {progressChart.length ? (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={progressChart} layout="vertical" margin={{ left: 0, right: 12 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Bar dataKey="progress" fill="#22c55e" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <div className="h-56 flex items-center justify-center text-gray-400">No sites yet</div>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

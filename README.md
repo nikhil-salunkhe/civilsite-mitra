@@ -55,8 +55,8 @@ CivilSiteMitra/
 │       ├── context/        # AuthContext (axios + session state)
 │       ├── layouts/        # AdminLayout, EngineerLayout
 │       ├── pages/          # Login, Profile, Settings
-│       │   ├── admin/      # AdminDashboard, EngineersList, CreateEngineer, EngineerDetail, AuditLogs, AllSites
-│       │   └── engineer/   # EngineerDashboard, SitesList, CreateSite, SiteDashboard
+│       │   ├── admin/      # AdminDashboard, EngineersList, CreateEngineer, EngineerDetail, AdminReports, AdminAnalytics, AuditLogs, AllSites
+│       │   └── engineer/   # EngineerDashboard, SitesList, CreateSite, SiteDashboard, EngineerReports, GlobalRecords (6 modules)
 │       │       └── siteTabs/  # 10 tabs + shared CRUD machinery
 │       └── utils/
 ├── IMPLEMENTATION_PLAN.md
@@ -137,7 +137,7 @@ Never commit `.env`.
 # terminal 1
 cd backend; npm run dev
 # terminal 2
-cd backend; npm test        # tools/smoke-test.js — 100 checks: auth, RBAC,
+cd backend; npm test        # tools/smoke-test.js — 104 checks: auth, RBAC,
                             # engineer isolation, site CRUD, financial modules,
                             # lifecycle, reports, PDF/Excel/CSV, profile photo, audit logs
 ```
@@ -153,7 +153,7 @@ Base URL: `http://localhost:5000/api`
 - **Auth** — `POST /auth/login` · `POST /auth/logout` · `POST /auth/change-password` · `GET /auth/me` · `PUT /auth/profile` (multipart photo) · forgot/reset password
 - **Admin** (Super Admin only) — `GET /admin/dashboard` · `GET /admin/reports` (Date/Engineer/Status/Site filters) · engineers CRUD · `PATCH /admin/engineers/:id/status` · `POST .../reset-password` · `DELETE .../:id` · `GET /admin/sites` · `GET /admin/audit-logs`
 - **Sites** — CRUD + `GET /sites/:id/summary` + `PATCH /:id/archive` + `PATCH /:id/complete` + `PUT|PATCH /:id/progress`
-- **Site modules** — `payments`, `installments`, `workers`, `worker-payments`, `materials`, `vendors`, `vendor-payments`, `expenses`, `activities`, `documents` (nested under `/sites/:siteId/…`)
+- **Site modules** — `payments`, `installments`, `workers`, `worker-payments`, `materials`, `vendors`, `vendor-payments`, `expenses`, `activities`, `documents` (nested under `/sites/:siteId/…`) · **Engineer globals** — `GET /engineer/:module` (workers|materials|vendors|expenses|activities|documents, engineer-scoped cross-site lists)
 - **Reports** — `GET /sites/:id/reports` · `GET /sites/:id/report/pdf` · `GET /sites/:id/export/excel|csv`
 
 All responses use `{ success, data, message }`. Auth via HTTP-only cookie **or** `Authorization: Bearer` header.

@@ -600,6 +600,32 @@ async function main() {
     }
   }
 
+  // --- Global sidebar records + engineer date filter (spec sections 38/6) ---
+  {
+    const rec = await req('GET', '/engineer/workers', { token: tokenA });
+    await expect('Global workers page loads for engineer',
+      rec.status < 300 && Array.isArray(rec.data?.data?.items),
+      `status ${rec.status}`);
+
+    // A foreign site id must yield an empty list (engineer scope), never data.
+    const foreign = await req('GET', '/engineer/workers?siteId=000000000000000000000000', { token: tokenA });
+    await expect('Global records ignore foreign site ids (empty)',
+      foreign.status < 300 && (foreign.data?.data?.items || []).length === 0,
+      `status ${foreign.status}`);
+
+    const future = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const excl = await req('GET', `/admin/engineers?from=${future}`, { token: adminToken });
+    const exclRows = excl.data?.data?.engineers || [];
+    await expect('Engineer date filter excludes earlier records',
+      excl.status < 300 && !exclRows.some((e) => String(e._id) === String(engA._id)),
+      `status ${excl.status} rows=${exclRows.length}`);
+
+    const past = await req('GET', '/admin/engineers?from=2000-01-01&sortBy=name&sortOrder=asc', { token: adminToken });
+    await expect('Engineer date filter + sorting accepted',
+      past.status < 300 && (past.data?.data?.engineers || []).some((e) => String(e._id) === String(engA._id)),
+      `status ${past.status}`);
+  }
+
   // --- Profile photo lifecycle: upload -> replace -> cascade delete ---
   {
     const uploadPhoto = async () => {

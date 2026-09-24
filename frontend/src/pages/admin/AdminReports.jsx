@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { PageHeader, StatusBadge } from '../../components/UI';
@@ -10,7 +10,14 @@ import { PageHeader, StatusBadge } from '../../components/UI';
  * numbers always match the admin dashboard.
  */
 export const AdminReports = () => {
-  const [filters, setFilters] = useState({ from: '', to: '', engineerId: '', status: '' });
+  // Pre-seed from /admin/reports?engineerId=... ("View Reports" drill-through).
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState({
+    from: '',
+    to: '',
+    engineerId: searchParams.get('engineerId') || '',
+    status: '',
+  });
   const [data, setData] = useState(null);
   const [engineers, setEngineers] = useState([]);
   const [loading, setLoading] = useState(true);

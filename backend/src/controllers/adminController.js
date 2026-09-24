@@ -86,7 +86,7 @@ const getDashboard = asyncHandler(async (req, res) => {
 
 // Get all engineers with pagination and filters
 const getEngineers = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, search, status, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+  const { page = 1, limit = 20, search, status, from, to, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
   const query = { role: USER_ROLES.ENGINEER };
 
@@ -103,8 +103,22 @@ const getEngineers = asyncHandler(async (req, res) => {
     query.status = status;
   }
 
+  // Date-range filter on account creation (spec section 6).
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = new Date(from);
+    if (to) {
+      const end = new Date(to);
+      if (String(to).length <= 10) end.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = end;
+    }
+  }
+
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+  // Whitelisted sort keys - never pass raw user input to the sort spec.
+  const allowedSort = ['createdAt', 'name', 'status', 'email'];
+  const sortKey = allowedSort.includes(sortBy) ? sortBy : 'createdAt';
+  const sort = { [sortKey]: sortOrder === 'asc' ? 1 : -1 };
 
   const [engineers, total] = await Promise.all([
     User.find(query).sort(sort).skip(skip).limit(parseInt(limit)).select('-password -resetToken -resetExpiry'),

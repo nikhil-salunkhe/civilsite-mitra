@@ -66,6 +66,22 @@ const ReportsTab = ({ siteId }) => {
     }
   };
 
+  // Opens the A4 PDF in a new tab for on-screen preview (spec section 35).
+  const previewPdf = async () => {
+    setExporting('pdf');
+    try {
+      const res = await api.get(`/sites/${siteId}/report/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      toast.success('PDF preview opened');
+    } catch {
+      toast.error('Preview failed');
+    } finally {
+      setExporting('');
+    }
+  };
+
   if (loading) {
     return <div className="card p-8 text-center text-gray-400">Building report...</div>;
   }
@@ -79,6 +95,9 @@ const ReportsTab = ({ siteId }) => {
       <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold text-gray-900">Site Report</h3>
         <div className="flex gap-2">
+          <button type="button" className="btn btn-primary btn-sm" disabled={exporting === 'pdf'} onClick={previewPdf}>
+            {exporting === 'pdf' ? 'Loading...' : 'Preview PDF'}
+          </button>
           <button type="button" className="btn btn-secondary btn-sm" disabled={exporting === 'excel'} onClick={() => exportFile('excel')}>
             {exporting === 'excel' ? 'Exporting...' : 'Export Excel'}
           </button>

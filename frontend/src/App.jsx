@@ -13,6 +13,8 @@ import { EngineerDetail } from './pages/admin/EngineerDetail';
 import { AuditLogs } from './pages/admin/AuditLogs';
 import { AdminReports } from './pages/admin/AdminReports';
 import { EngineerReports } from './pages/engineer/EngineerReports';
+import { AdminAnalytics } from './pages/admin/AdminAnalytics';
+import { GlobalRecords } from './pages/engineer/GlobalRecords';
 import { AllSites } from './pages/admin/AllSites';
 import { SitesList } from './pages/engineer/SitesList';
 import { CreateSite } from './pages/engineer/CreateSite';
@@ -56,6 +58,7 @@ const AppRoutes = () => {
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="reports" element={<AdminReports />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="engineers" element={<EngineersList />} />
         <Route path="engineers/create" element={<CreateEngineer />} />
         <Route path="engineers/:id/edit" element={<CreateEngineer />} />
@@ -74,6 +77,12 @@ const AppRoutes = () => {
         <Route path="sites/create" element={<CreateSite />} />
         <Route path="sites/:id" element={<SiteDashboard />} />
         <Route path="reports" element={<EngineerReports />} />
+        <Route path="workers" element={<GlobalRecords module="workers" />} />
+        <Route path="materials" element={<GlobalRecords module="materials" />} />
+        <Route path="vendors" element={<GlobalRecords module="vendors" />} />
+        <Route path="expenses" element={<GlobalRecords module="expenses" />} />
+        <Route path="activities" element={<GlobalRecords module="activities" />} />
+        <Route path="documents" element={<GlobalRecords module="documents" />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>

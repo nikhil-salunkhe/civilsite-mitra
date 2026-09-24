@@ -119,8 +119,9 @@ export const EngineerDetail = () => {
         title={engineer.name}
         subtitle={`${engineer.company || 'Independent'} • ${engineer.email}`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button onClick={() => navigate(`/admin/engineers/${id}/edit`)} className="btn btn-primary">Edit</button>
+            <button onClick={() => navigate(`/admin/reports?engineerId=${id}`)} className="btn btn-secondary">View Reports</button>
             <button onClick={() => navigate('/admin/engineers')} className="btn btn-secondary">Back to List</button>
           </div>
         }

@@ -4,7 +4,7 @@
 **Scope:** Complete remaining work — all phases of IMPLEMENTATION_PLAN.md
 **Date:** 25 September 2026
 **Status:** COMPLETE — every planned phase delivered and verified
-**Verification (fresh, this report):** backend syntax 0 failures, E2E 100 passed / 0 failed (exit 0), API live on :5000, frontend build exit 0, initial git commit created
+**Verification (fresh, this report):** backend syntax 0 failures, E2E 104 passed / 0 failed (exit 0), API live on :5000, frontend build exit 0, git commits created
 **Related:** IMPLEMENTATION_PLAN.md, REPORT_REMAINING_WORK.md
 **Re-verify:** `cd backend && node tools/smoke-test.js` (needs MongoDB + API on :5000)
 
@@ -19,7 +19,7 @@
 | Phase 3 APIs | Auth+Admin+Sites+Financials+Reports | ~71 routes, 14 controllers, E2E 91/91 passing |
 | Phase 4 pages | Auth+Admin+Engineer | All routes wired in App.jsx, 10 site tabs, build exit 0 (918 modules) |
 | Unwired features | 0 allowed | 0 — photo, admin profile, lifecycle all closed |
-| E2E checks | whole site testable | 100 passed / 0 failed, self-healing suite (668 lines) |
+| E2E checks | whole site testable | 104 passed / 0 failed, self-healing suite (~700 lines) |
 | Security (9 items) | JWT..file validation | All 9 implemented (see S7) |
 | Version control | — | Git initialized — initial commit created (`.gitignore` excludes `.env`, `node_modules`, `uploads`, logs) |
 
@@ -187,7 +187,23 @@ Plan stack confirmed on disk. Security 9/9: (1) JWT Bearer + /me re-validation; 
 
 Verification: SYNTAX_FAILS=0 · 45/45 modules · BUILD_EXIT=0 (6.11s) · E2E **100 passed / 0 failed exit 0** (+9 new checks: reports totals/filter/400/403, overdue create+derive, photo upload/replace/cascade) · live `GET /admin/reports` returns real totals (SITES=1, ENG=1, PV=1280000, PROFIT=1280000) · DB clean (0 leftover fixtures) · PROGRESS_CHECK=PASS.
 
-*Fresh run: 45 backend files clean, all frontend pages routed, 14 models, 14 controllers, 3 routers, E2E 100/100 exit 0, temps cleaned, initial git commit created.*
+## 11. Full-spec completion pass — remaining pages vs prompt #1 (24 September 2026)
+
+| Gap vs master prompt | Spec | Delivered |
+|---|---|---|
+| Engineer sidebar | §38 | Complete: Dashboard, My Sites, **Add Site**, **Workers**, **Materials**, **Vendors**, **Expenses**, **Activities**, Reports, **Documents**, Profile, Settings, Logout |
+| Global records pages | §38 | New `GET /api/engineer/:module` (engineer-scoped, paginated, per-module search fields, site filter — foreign site ids yield empty lists) + one generic `GlobalRecords.jsx` serving 6 routes with per-module columns, money/date renderers, document download and Open Site links |
+| Admin sidebar | §39 | + **Add Engineer**, + **Analytics** |
+| Admin Analytics page | §39 | New `AdminAnalytics.jsx` — KPI cards + Sites-by-Status / Engineers-by-Status / Investment-Breakdown pies + Top-Engineers bar (recharts over existing `/admin/reports` + `/admin/dashboard`; no money logic in the client) |
+| Engineer dashboard charts | §9 | Added **Investment Breakdown**, **Payment Status**, **Profit Overview**, **Site Progress** (visualizations of backend summary numbers only) |
+| Engineer list filters/sorting | §6 | Backend: `from`/`to` date filter + sort-key **whitelist**; UI: date-range + sort select + page-reset on every filter change |
+| View Reports action | §6 | EngineerDetail → `/admin/reports?engineerId=…`; AdminReports pre-seeds its filter via `useSearchParams` |
+| Forgot-password UI | §3 | Login page: *Forgot password?* → request → (dev token shown, withheld in production) → set new password via `/auth/forgot-password` + `/auth/reset-password {token,newPassword}` |
+| PDF preview | §35 | Reports tab: **Preview PDF** opens the A4 report in a new tab (blob, revoked after 60 s) |
+
+Verification: SYNTAX_FAILS=0 · **47/47 modules** (2 new backend files) · BUILD_EXIT=0 (7.92s) · E2E **104 passed / 0 failed exit 0** (+4 checks: global records list, foreign-site empty isolation, engineer date-filter exclusion, filter+sort acceptance) · DB clean (0 fixtures).
+
+*Fresh run: 47 backend files clean, all frontend pages routed, 14 models, 15 controllers, 4 routers, E2E 104/104 exit 0, temps cleaned, git commits created.*
 
 
 

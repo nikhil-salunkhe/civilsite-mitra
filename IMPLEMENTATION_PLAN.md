@@ -11,9 +11,9 @@ Professional Construction Site Management SaaS built with MERN Stack.
 |---|---|---|
 | 1 — Project setup & architecture | ✅ Implemented | 44 JS files in `backend/src`, 25 page components in `frontend/src/pages` |
 | 2 — Database models | ✅ Implemented | 14 Mongoose models in `backend/src/models` |
-| 3 — Backend APIs | ✅ Implemented & E2E-verified | 100 / 100 end-to-end checks passing |
+| 3 — Backend APIs | ✅ Implemented & E2E-verified | 104 / 104 end-to-end checks passing |
 | 4 — Frontend pages | ✅ Implemented | all routes wired in `App.jsx`; production build exit 0 (918 modules) |
-| Verification | ✅ Complete | backend syntax 0 failures · build exit 0 · E2E 100 passed / 0 failed · API + web + proxy HTTP 200 |
+| Verification | ✅ Complete | backend syntax 0 failures · build exit 0 · E2E 104 passed / 0 failed · API + web + proxy HTTP 200 |
 
 Last verified: 24 September 2026 — run `node tools/smoke-test.js` from `backend/` (needs MongoDB + the API on :5000).
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, api } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
 export const LoginPage = () => {
@@ -10,6 +10,15 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // Forgot-password flow (spec section 3): request -> (dev token) -> reset.
+  const [view, setView] = useState('login');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   if (isAuthenticated) {
     navigate('/admin/dashboard');
@@ -39,6 +48,40 @@ export const LoginPage = () => {
     }
   };
 
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    try {
+      const { data } = await api.post('/auth/forgot-password', { email: forgotEmail });
+      setResetToken(data.resetToken || '');
+      setView('reset-sent');
+      toast.success(data.message || 'Reset instructions generated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Request failed');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      const { data } = await api.post('/auth/reset-password', { token: resetToken, newPassword });
+      toast.success(data.message || 'Password reset successfully');
+      setView('login');
+      setPassword('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reset failed');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -57,6 +100,8 @@ export const LoginPage = () => {
 
         {/* Login Card */}
         <div className="bg-white rounded-xl shadow-xl shadow-gray-200/50 p-6">
+          {view === 'login' && (
+          <React.Fragment>
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Sign in to your account</h2>
             <p className="text-sm text-gray-500 mt-1">Enter your credentials to access the system</p>
@@ -87,6 +132,16 @@ export const LoginPage = () => {
               />
             </div>
 
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => { setView('forgot'); setError(''); }}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                Forgot password?
+              </button>
+            </div>
+
             {error && (
               <div className="alert alert-danger">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,6 +167,88 @@ export const LoginPage = () => {
               ) : 'Sign In'}
             </button>
           </form>
+          </React.Fragment>
+          )}
+
+          {view === 'forgot' && (
+            <form onSubmit={handleForgot} className="space-y-4">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Forgot your password?</h2>
+                <p className="text-sm text-gray-500 mt-1">Enter your registered email to generate a reset link</p>
+              </div>
+              <div>
+                <label className="label">Email Address</label>
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="input"
+                  required
+                />
+              </div>
+              <button type="submit" disabled={forgotLoading} className="btn btn-primary w-full py-3">
+                {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+              </button>
+              <button type="button" onClick={() => setView('login')} className="btn btn-secondary w-full">
+                Back to Sign In
+              </button>
+            </form>
+          )}
+
+          {view === 'reset-sent' && (
+            <form onSubmit={handleReset} className="space-y-4">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Reset your password</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  If email delivery is not configured, use the reset token below (development mode only)
+                </p>
+              </div>
+              {resetToken ? (
+                <div>
+                  <label className="label">Reset Token</label>
+                  <textarea
+                    readOnly
+                    value={resetToken}
+                    className="input h-20 text-xs"
+                    onClick={(e) => e.target.select()}
+                  />
+                </div>
+              ) : (
+                <div className="alert alert-danger text-sm">
+                  No reset token available in this environment. Ask your Super Admin to reset your password.
+                </div>
+              )}
+              <div>
+                <label className="label">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="label">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <button type="submit" disabled={resetLoading || !resetToken} className="btn btn-primary w-full py-3">
+                {resetLoading ? 'Resetting...' : 'Reset Password'}
+              </button>
+              <button type="button" onClick={() => setView('login')} className="btn btn-secondary w-full">
+                Back to Sign In
+              </button>
+            </form>
+          )}
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-6">
