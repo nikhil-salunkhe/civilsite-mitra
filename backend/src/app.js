@@ -17,6 +17,22 @@ const engineerRoutes = require('./routes/engineer');
 
 const app = express();
 
+/**
+ * Trust proxy configuration.
+ *
+ * Render terminates TLS and forwards the real client IP in X-Forwarded-For.
+ * Without this, express sees every request as arriving from Render's own proxy
+ * IP, which causes two production problems:
+ *   1. the ERR_ERL_UNEXPECTED_X_FORWARDED_FOR warning from express-rate-limit;
+ *   2. every visitor collapses into ONE rate-limit bucket, so 20 failed logins
+ *      from a single attacker locks out every engineer in the entire system.
+ *
+ * We trust exactly ONE hop (Render's proxy) - the correct setting for a single
+ * reverse proxy in front of the app. `app.set('trust proxy', true)` would be
+ * UNSAFE: a client could spoof X-Forwarded-For and evade rate limiting.
+ */
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false,
