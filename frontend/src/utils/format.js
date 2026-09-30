@@ -77,8 +77,25 @@ export const formatFileSize = (bytes) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-/** Resolve the API base so uploaded files and export links work in dev and prod */
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+/**
+ * API base URL.
+ *
+ * The backend mounts EVERY router under /api (see backend/src/app.js):
+ *   POST /api/auth/login, GET /api/sites, GET /api/admin/dashboard ...
+ *
+ * So the base must include the /api suffix. If a host sets VITE_API_URL to the
+ * bare origin (https://host) the app would silently request /auth/login and get
+ * a 404, which is exactly what happened on Render. normaliseApiBase() appends
+ * the suffix so both forms work, while a dev value of '/api' is left untouched.
+ */
+const normaliseApiBase = (value) => {
+  const raw = (value || '').trim().replace(/\/+$/, '');   // drop trailing slashes
+  if (!raw) return '/api';                                  // dev: Vite proxy handles it
+  if (/\/api$/i.test(raw)) return raw;                      // already correct
+  return `${raw}/api`;                                       // bare origin -> add it
+};
+
+export const API_BASE_URL = normaliseApiBase(import.meta.env.VITE_API_URL);
 
 export const buildExportUrl = (path) => `${API_BASE_URL}${path}`;
 
