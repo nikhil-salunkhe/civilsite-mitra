@@ -8,21 +8,25 @@ export const CreateSite = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [loading, setLoading] = useState(false);
+  const [loadingSite, setLoadingSite] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [form, setForm] = useState({
     siteName: '', ownerName: '', ownerMobile: '', ownerEmail: '', address: '', city: '', state: '', pincode: '',
     totalArea: '', ratePerArea: '', areaUnit: 'Sq.Ft', status: 'Planned', startDate: '', expectedCompletionDate: '',
-    estimatedProjectCost: '', engineerCharges: '', notes: ''
+    estimatedProjectCost: '', engineerCharges: '', notes: '',
   });
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (id) {
       setIsEdit(true);
+      setLoadingSite(true);
       api.get(`/sites/${id}`).then(({ data }) => {
-        const s = data.data;
+        // GET /sites/:id answers { data: { site, summary } }.
+        const s = data.data?.site || data.data;
         setForm({ siteName: s.siteName, ownerName: s.ownerName, ownerMobile: s.ownerMobile, ownerEmail: s.ownerEmail || '', address: s.address, city: s.city, state: s.state || '', pincode: s.pincode || '', totalArea: s.totalArea.toString(), ratePerArea: s.ratePerArea.toString(), areaUnit: s.areaUnit || 'Sq.Ft', status: s.status || 'Planned', startDate: s.startDate ? new Date(s.startDate).toISOString().split('T')[0] : '', expectedCompletionDate: s.expectedCompletionDate ? new Date(s.expectedCompletionDate).toISOString().split('T')[0] : '', estimatedProjectCost: s.estimatedProjectCost?.toString() || '', engineerCharges: s.engineerCharges?.toString() || '', notes: s.notes || '' });
-      }).catch(() => toast.error('Failed to load'));
+      }).catch((err) => toast.error(err.response?.data?.message || 'Failed to load site'))
+        .finally(() => setLoadingSite(false));
     }
   }, [id]);
 
@@ -34,7 +38,8 @@ export const CreateSite = () => {
   const f = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
   const calcVal = () => (parseFloat(form.totalArea) || 0) * (parseFloat(form.ratePerArea) || 0);
 
-  if (loading && isEdit) return <div className="flex justify-center py-12"><div className="spinner w-8 h-8"></div></div>;
+  // Edit mode must not flash an empty "Add New Site" form while the site loads.
+  if (loadingSite) return <div className="flex justify-center py-12"><div className="spinner w-8 h-8"></div></div>;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -51,8 +56,8 @@ export const CreateSite = () => {
         <FormSection title="Construction Details">
           <FormRow><FormGroup label="Total Area *" error={errors.totalArea}><input type="number" value={form.totalArea} onChange={e => chg('totalArea', e.target.value)} className="input" min={0} step={0.01} /></FormGroup><FormGroup label="Unit"><select value={form.areaUnit} onChange={e => chg('areaUnit', e.target.value)} className="select"><option value="Sq.Ft">Sq.Ft</option><option value="Sq.Mtr">Sq.Mtr</option></select></FormGroup></FormRow>
           <FormRow><FormGroup label="Rate Per Area *" error={errors.ratePerArea}><input type="number" value={form.ratePerArea} onChange={e => chg('ratePerArea', e.target.value)} className="input" min={0} step={0.01} /></FormGroup><FormGroup label="Est. Cost"><input type="number" value={form.estimatedProjectCost} onChange={e => chg('estimatedProjectCost', e.target.value)} className="input" min={0} step={0.01} /></FormGroup></FormRow>
-          <div className="p-4 rounded bg-blue-50 border border-blue-200"><p className="text-sm text-blue-800"><strong>Project Value: {f(calcVal())}</strong></p><p className="text-xs text-blue-600">{form.totalArea || 0} {form.areaUnit} × ₹{form.ratePerArea || 0}</p></div>
-          <FormGroup label="Your Charges"><input type="number" value={form.engineCharges} onChange={e => chg('engineerCharges', e.target.value)} className="input" min={0} step={0.01} /></FormGroup>
+          <div className="p-4 rounded bg-primary-50 border border-primary-200"><p className="text-sm text-primary-800"><strong>Project Value: {f(calcVal())}</strong></p><p className="text-xs text-primary-600">{form.totalArea || 0} {form.areaUnit} × ₹{form.ratePerArea || 0}</p></div>
+          <FormGroup label="Your Charges"><input type="number" value={form.engineerCharges || ''} onChange={e => chg('engineerCharges', e.target.value)} className="input" min={0} step={0.01} /></FormGroup>
           <FormRow><FormGroup label="Start Date"><input type="date" value={form.startDate} onChange={e => chg('startDate', e.target.value)} className="input" /></FormGroup><FormGroup label="Expected Completion"><input type="date" value={form.expectedCompletionDate} onChange={e => chg('expectedCompletionDate', e.target.value)} className="input" /></FormGroup></FormRow>
         </FormSection>
         <FormSection title="Notes"><FormGroup label=""><textarea value={form.notes} onChange={e => chg('notes', e.target.value)} className="textarea" rows={3} placeholder="Notes..." /></FormGroup></FormSection>

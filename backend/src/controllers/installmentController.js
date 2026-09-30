@@ -1,4 +1,5 @@
 const Installment = require('../models/Installment');
+const Payment = require('../models/Payment');
 const { INSTALLMENT_STATUS } = require('../config/constants');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ApiError } = require('../middleware/errorHandler');
@@ -8,19 +9,36 @@ const getInstallments = asyncHandler(async (req, res) => {
   const installments = await Installment.find({ site: req.params.siteId })
     .sort({ order: 1 });
 
-  // OVERDUE is time-dependent: recompute on read (same rules as the financial
-  // service and the UI) and persist any change so stored data never goes stale.
+  // Paid amounts are re-derived from the Payment records (the source of truth)
+  // with the same max(cached, linked-payments) rule the financial service uses,
+  // then the time-dependent status is recomputed and any change persisted so
+  // the tab, reports and stored status can never disagree.
+  let paidMap = new Map();
+  if (installments.length) {
+    const paidRows = await Payment.aggregate([
+      { $match: { site: installments[0].site, installment: { $ne: null } } },
+      { $group: { _id: '$installment', paid: { $sum: '$amount' } } },
+    ]);
+    paidMap = new Map(paidRows.map((r) => [String(r._id), r.paid]));
+  }
+
   const now = new Date();
   const dirty = [];
   for (const doc of installments) {
-    const pending = (Number(doc.amount) || 0) - (Number(doc.paidAmount) || 0);
+    const viaPayments = paidMap.get(String(doc._id)) || 0;
+    const cached = Math.round((Number(doc.paidAmount) || 0) * 100) / 100;
+    const amount = Math.round((Number(doc.amount) || 0) * 100) / 100;
+    const paidAmount = Math.min(amount, Math.round(Math.max(cached, viaPayments) * 100) / 100);
+
+    const pending = amount - paidAmount;
     let status;
     if (pending <= 0) status = INSTALLMENT_STATUS.PAID;
-    else if (Number(doc.paidAmount) > 0) status = INSTALLMENT_STATUS.PARTIAL;
+    else if (paidAmount > 0) status = INSTALLMENT_STATUS.PARTIAL;
     else if (doc.dueDate && doc.dueDate < now) status = INSTALLMENT_STATUS.OVERDUE;
     else status = INSTALLMENT_STATUS.PENDING;
 
-    if (doc.status !== status) {
+    if (doc.status !== status || doc.paidAmount !== paidAmount) {
+      doc.paidAmount = paidAmount;
       doc.status = status;
       dirty.push(doc.save());
     }
@@ -43,6 +61,12 @@ const createInstallment = asyncHandler(async (req, res) => {
 
   if (amount <= 0) {
     throw new ApiError('Amount must be positive', 400);
+  }
+
+  // Spec section 12: a site supports 1-5 installments.
+  const existingCount = await Installment.countDocuments({ site: req.params.siteId });
+  if (existingCount >= 5) {
+    throw new ApiError('A maximum of 5 installments is allowed per site', 400);
   }
 
   // `order` positions the installment in the payment schedule. Clients that omit

@@ -13,7 +13,7 @@ export const AuditLogs = () => {
   useEffect(() => {
     api.get('/admin/audit-logs', { params: { page, limit: 20, search: search || undefined } })
       .then(({ data }) => { setLogs(data.data.logs || []); setPagination(data.data.pagination); })
-      .catch(() => toast.error('Failed to load logs'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load logs'))
       .finally(() => setLoading(false));
   }, [page, search]);
 

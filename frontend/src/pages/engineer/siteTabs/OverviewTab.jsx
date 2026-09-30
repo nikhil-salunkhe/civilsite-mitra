@@ -2,6 +2,7 @@ import React from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { StatusBadge } from '../../../components/UI';
+
 import { money, fmtDate } from './shared';
 
 const OverviewTab = ({ site, summary, onChanged }) => {
@@ -10,7 +11,10 @@ const OverviewTab = ({ site, summary, onChanged }) => {
   const fallbackValue = Number(site.totalArea || 0) * Number(site.ratePerArea || 0);
   const received = summary?.totalReceived ?? summary?.amountReceived ?? 0;
   const pending =
-    summary?.pendingAmount ?? summary?.pending ?? Math.max(0, fallbackValue - Number(received || 0));
+    summary?.pendingReceivable ??
+    summary?.pendingAmount ??
+    summary?.pending ??
+    Math.max(0, fallbackValue - Number(received || 0));
   const cards = [
     { label: 'Project Value', v: money(summary?.projectValue ?? fallbackValue), c: 'border-l-primary-500' },
     { label: 'Amount Received', v: money(received), c: 'border-l-success-500' },
@@ -27,8 +31,8 @@ const OverviewTab = ({ site, summary, onChanged }) => {
       await api.put(`/sites/${site._id}/progress`, { overallProgress: p });
       toast.success(`Progress set to ${p}%`);
       onChanged?.();
-    } catch {
-      toast.error('Failed to update progress');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update progress');
     }
   };
 
@@ -38,8 +42,8 @@ const OverviewTab = ({ site, summary, onChanged }) => {
       await api.patch(`/sites/${site._id}/complete`);
       toast.success('Site marked as completed');
       onChanged?.();
-    } catch {
-      toast.error('Failed to complete site');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to complete site');
     }
   };
 
@@ -50,8 +54,8 @@ const OverviewTab = ({ site, summary, onChanged }) => {
       await api.patch(`/sites/${site._id}/archive`, { isArchived: next });
       toast.success(next ? 'Site archived' : 'Site restored');
       onChanged?.();
-    } catch {
-      toast.error('Failed to update site');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update site');
     }
   };
 
@@ -101,9 +105,9 @@ const OverviewTab = ({ site, summary, onChanged }) => {
             </div>
             <span className="text-sm font-bold min-w-[3rem]">{progress}%</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
             {[0, 25, 50, 75, 100].map((p) => (
-              <button
+              <button type="button" 
                 key={p}
                 onClick={() => setProgress(p)}
                 className={`btn btn-sm ${progress === p ? 'btn-primary' : 'btn-secondary'}`}
@@ -114,11 +118,11 @@ const OverviewTab = ({ site, summary, onChanged }) => {
           </div>
           <div className="space-y-2">
             {site.status !== 'Completed' && (
-              <button onClick={complete} className="btn btn-primary w-full">
+              <button type="button"  onClick={complete} className="btn btn-primary w-full">
                 Mark as Completed
               </button>
             )}
-            <button onClick={toggleArchive} className="btn btn-secondary w-full">
+            <button type="button"  onClick={toggleArchive} className="btn btn-secondary w-full">
               {site.isArchived ? 'Restore Site' : 'Archive Site'}
             </button>
           </div>

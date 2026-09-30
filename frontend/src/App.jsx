@@ -75,6 +75,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<EngineerDashboard />} />
         <Route path="sites" element={<SitesList />} />
         <Route path="sites/create" element={<CreateSite />} />
+        <Route path="sites/:id/edit" element={<CreateSite />} />
         <Route path="sites/:id" element={<SiteDashboard />} />
         <Route path="reports" element={<EngineerReports />} />
         <Route path="workers" element={<GlobalRecords module="workers" />} />

@@ -41,6 +41,36 @@ const vendorSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Optional business/compliance fields. Deliberately all optional: most local
+    // contractors deal with small traders who have no GST/PAN on record.
+    companyName: {
+      type: String,
+      trim: true,
+    },
+    gstNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    panNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+    openingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    creditLimit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    paymentTerms: {
+      type: String,
+      trim: true,
+    },
     notes: {
       type: String,
       trim: true,

@@ -28,8 +28,8 @@ export const EngineerDetail = () => {
     try {
       const { data } = await api.get(`/admin/engineers/${id}`);
       setEngineer(data.data);
-    } catch {
-      toast.error('Failed to load engineer');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load engineer');
     } finally {
       setLoading(false);
     }
@@ -56,8 +56,8 @@ export const EngineerDetail = () => {
       await api.patch(`/admin/engineers/${id}/status`, { status: target.status });
       toast.success(`Engineer ${target.status.toLowerCase()} successfully`);
       fetchDetail();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -69,8 +69,8 @@ export const EngineerDetail = () => {
       toast.success('Password reset. Share the temporary password with the engineer.');
       setNewPassword(data.temporaryPassword || data.data?.temporaryPassword || '');
       fetchDetail();
-    } catch {
-      toast.error('Failed to reset password');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reset password');
     }
   };
 
@@ -94,7 +94,7 @@ export const EngineerDetail = () => {
       <EmptyState
         title="Engineer not found"
         description="This account does not exist."
-        action={<button onClick={() => navigate('/admin/engineers')} className="btn btn-primary">Back to Engineers</button>}
+        action={<button type="button"  onClick={() => navigate('/admin/engineers')} className="btn btn-primary">Back to Engineers</button>}
       />
     );
   }
@@ -120,9 +120,9 @@ export const EngineerDetail = () => {
         subtitle={`${engineer.company || 'Independent'} • ${engineer.email}`}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => navigate(`/admin/engineers/${id}/edit`)} className="btn btn-primary">Edit</button>
-            <button onClick={() => navigate(`/admin/reports?engineerId=${id}`)} className="btn btn-secondary">View Reports</button>
-            <button onClick={() => navigate('/admin/engineers')} className="btn btn-secondary">Back to List</button>
+            <button type="button"  onClick={() => navigate(`/admin/engineers/${id}/edit`)} className="btn btn-primary">Edit</button>
+            <button type="button"  onClick={() => navigate(`/admin/reports?engineerId=${id}`)} className="btn btn-secondary">View Reports</button>
+            <button type="button"  onClick={() => navigate('/admin/engineers')} className="btn btn-secondary">Back to List</button>
           </div>
         }
       />
@@ -150,7 +150,7 @@ export const EngineerDetail = () => {
           <h3 className="card-title mb-4">Account Actions</h3>
           <div className="space-y-2">
             {STATUS_ACTIONS.map((action) => (
-              <button
+              <button type="button" 
                 key={action.status}
                 disabled={engineer.status === action.status}
                 onClick={() => setConfirmAction(action)}
@@ -171,10 +171,10 @@ export const EngineerDetail = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
-              <button onClick={handleResetPassword} className="btn btn-primary">Reset</button>
+              <button type="button"  onClick={handleResetPassword} className="btn btn-primary">Reset</button>
             </div>
             {newPassword && (
-              <button
+              <button type="button" 
                 onClick={() => { navigator.clipboard.writeText(newPassword); toast.success('Password copied'); }}
                 className="btn btn-secondary btn-sm w-full mt-2"
               >
@@ -184,7 +184,7 @@ export const EngineerDetail = () => {
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-200">
-            <button
+            <button type="button" 
               onClick={() =>
                 setConfirmAction({
                   type: 'delete',

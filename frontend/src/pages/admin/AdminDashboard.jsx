@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { PageHeader } from '../../components/UI';
+import { Icon } from '../../components/Icon';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 export const AdminDashboard = () => {
@@ -13,7 +14,7 @@ export const AdminDashboard = () => {
   useEffect(() => {
     api.get('/admin/dashboard')
       .then(({ data: response }) => setData(response.data))
-      .catch(() => toast.error('Failed to load dashboard'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load dashboard'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -40,7 +41,7 @@ export const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Admin Dashboard" subtitle="Platform Overview" actions={
-        <button onClick={() => navigate('/admin/engineers/create')} className="btn btn-primary">
+        <button type="button"  onClick={() => navigate('/admin/engineers/create')} className="btn btn-primary">
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Create Engineer
         </button>
@@ -48,13 +49,13 @@ export const AdminDashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Engineers', value: data?.engineers?.total || 0, icon: '👷', color: 'bg-blue-50 text-blue-600' },
-          { label: 'Active Engineers', value: data?.engineers?.active || 0, icon: '✅', color: 'bg-green-50 text-green-600' },
-          { label: 'Suspended', value: data?.engineers?.suspended || 0, icon: '⏸️', color: 'bg-yellow-50 text-yellow-600' },
-          { label: 'Blocked', value: data?.engineers?.blocked || 0, icon: '🚫', color: 'bg-red-50 text-red-600' },
+          { label: 'Total Engineers', value: data?.engineers?.total || 0, icon: 'users', color: 'bg-primary-50 text-primary-600' },
+          { label: 'Active Engineers', value: data?.engineers?.active || 0, icon: 'checkCircle', color: 'bg-success-50 text-success-600' },
+          { label: 'Suspended', value: data?.engineers?.suspended || 0, icon: 'pause', color: 'bg-warning-50 text-warning-600' },
+          { label: 'Blocked', value: data?.engineers?.blocked || 0, icon: 'ban', color: 'bg-danger-50 text-danger-600' },
         ].map((card, i) => (
           <div key={i} className="dashboard-card">
-            <div className={`dashboard-card-icon ${card.color}`}><span className="text-2xl">{card.icon}</span></div>
+            <div className={`dashboard-card-icon ${card.color}`}><Icon name={card.icon} size={24} /></div>
             <p className="dashboard-card-value">{card.value}</p>
             <p className="dashboard-card-label">{card.label}</p>
           </div>
@@ -63,12 +64,12 @@ export const AdminDashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Total Sites', value: data?.sites?.total || 0, icon: '🏗️', color: 'bg-primary-50 text-primary-600' },
-          { label: 'Running Sites', value: data?.sites?.running || 0, icon: '▶️', color: 'bg-success-50 text-success-600' },
-          { label: 'Completed', value: data?.sites?.completed || 0, icon: '🏁', color: 'bg-blue-50 text-blue-600' },
+          { label: 'Total Sites', value: data?.sites?.total || 0, icon: 'building', color: 'bg-primary-50 text-primary-600' },
+          { label: 'Running Sites', value: data?.sites?.running || 0, icon: 'play', color: 'bg-success-50 text-success-600' },
+          { label: 'Completed', value: data?.sites?.completed || 0, icon: 'flag', color: 'bg-secondary-100 text-secondary-600' },
         ].map((card, i) => (
           <div key={i} className="dashboard-card">
-            <div className={`dashboard-card-icon ${card.color}`}><span className="text-2xl">{card.icon}</span></div>
+            <div className={`dashboard-card-icon ${card.color}`}><Icon name={card.icon} size={24} /></div>
             <p className="dashboard-card-value">{card.value}</p>
             <p className="dashboard-card-label">{card.label}</p>
           </div>

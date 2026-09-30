@@ -1,28 +1,27 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Icon } from '../components/Icon';
+import { Avatar } from '../components/Avatar';
 
 export const AdminLayout = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  // logout() clears the session and routes to /login itself.
+  const handleLogout = () => logout();
 
   const navItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: '🏠' },
-    { path: '/admin/engineers', label: 'Engineers', icon: '👷' },
-    { path: '/admin/engineers/create', label: 'Add Engineer', icon: '➕' },
-    { path: '/admin/sites', label: 'All Sites', icon: '🏗️' },
-    { path: '/admin/reports', label: 'Reports', icon: '📊' },
-    { path: '/admin/analytics', label: 'Analytics', icon: '📈' },
-    { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
-    { path: '/admin/profile', label: 'My Profile', icon: '👤' },
-    { path: '/admin/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: 'home' },
+    { path: '/admin/engineers', label: 'Engineers', icon: 'users' },
+    { path: '/admin/engineers/create', label: 'Add Engineer', icon: 'userPlus' },
+    { path: '/admin/sites', label: 'All Sites', icon: 'building' },
+    { path: '/admin/reports', label: 'Reports', icon: 'chartBar' },
+    { path: '/admin/analytics', label: 'Analytics', icon: 'trendingUp' },
+    { path: '/admin/audit-logs', label: 'Audit Logs', icon: 'clipboard' },
+    { path: '/admin/profile', label: 'My Profile', icon: 'user' },
+    { path: '/admin/settings', label: 'Settings', icon: 'cog' },
   ];
 
   return (
@@ -41,10 +40,8 @@ export const AdminLayout = () => {
                 <span className="text-xs text-gray-500 block">Admin Panel</span>
               </div>
             </Link>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn btn-icon btn-secondary rounded-full">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button type="button" aria-label="Close menu" onClick={() => setSidebarOpen(false)} className="lg:hidden btn btn-icon btn-secondary rounded-full">
+              <Icon name="x" size={18} />
             </button>
           </div>
 
@@ -62,7 +59,7 @@ export const AdminLayout = () => {
                       }`}
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <span>{item.icon}</span>
+                      <Icon name={item.icon} size={19} className="shrink-0" />
                       {item.label}
                     </Link>
                   </li>
@@ -73,18 +70,14 @@ export const AdminLayout = () => {
 
           <div className="px-4 py-4 border-t border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-sm font-medium text-primary-700">{user?.name?.charAt(0) || 'A'}</span>
-              </div>
+              <Avatar user={user} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+            <button type="button" onClick={handleLogout} className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <Icon name="logout" size={18} />
               Sign Out
             </button>
           </div>
@@ -98,10 +91,8 @@ export const AdminLayout = () => {
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between px-4 sm:px-6 py-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden btn btn-secondary btn-icon">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            <button type="button" aria-label="Open menu" onClick={() => setSidebarOpen(true)} className="lg:hidden btn btn-secondary btn-icon">
+              <Icon name="menu" size={18} />
             </button>
             <div className="hidden lg:block">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -111,7 +102,7 @@ export const AdminLayout = () => {
           </div>
         </header>
 
-        <main className="p-4 sm:p-6">
+        <main className="p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

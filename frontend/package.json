@@ -6,22 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:auth": "node tools/auth-flow-check.js",
+    "check:design": "node tools/design-audit.mjs",
+    "check": "npm run check:auth && npm run check:design && npm run check:bugs",
+    "check:bugs": "node tools/bug-hunt.mjs"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
     "axios": "^1.6.8",
-    "recharts": "^2.12.0",
     "date-fns": "^3.6.0",
-    "react-toastify": "^10.0.1",
-    "react-modal": "^3.16.1",
-    "lucide-react": "^0.344.0",
+    "joi": "^17.11.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
-    "xlsx": "^0.18.5",
-    "joi": "^17.11.0"
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-modal": "^3.16.1",
+    "react-router-dom": "^6.22.0",
+    "react-toastify": "^10.0.1",
+    "recharts": "^2.12.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

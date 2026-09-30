@@ -10,12 +10,17 @@ Professional Construction Site Management SaaS built with MERN Stack.
 | Phase | Status | Evidence |
 |---|---|---|
 | 1 — Project setup & architecture | ✅ Implemented | 44 JS files in `backend/src`, 25 page components in `frontend/src/pages` |
-| 2 — Database models | ✅ Implemented | 14 Mongoose models in `backend/src/models` |
-| 3 — Backend APIs | ✅ Implemented & E2E-verified | 104 / 104 end-to-end checks passing |
-| 4 — Frontend pages | ✅ Implemented | all routes wired in `App.jsx`; production build exit 0 (918 modules) |
-| Verification | ✅ Complete | backend syntax 0 failures · build exit 0 · E2E 104 passed / 0 failed · API + web + proxy HTTP 200 |
+| 2 — Database models | ✅ Implemented | 16 Mongoose models in `backend/src/models` (14 spec models + `MaterialUsage`, `WorkerAttendance`) |
+| 3 — Backend APIs | ✅ Implemented & E2E-verified | 128 / 128 end-to-end checks passing |
+| 4 — Frontend pages | ✅ Implemented | all routes wired in `App.jsx`; production build exit 0 (925 modules) |
+| Verification | ✅ Complete | backend syntax 0 failures · build exit 0 · E2E 128 passed / 0 failed · frontend/API contract audit 93 paths / 0 missing · API + web + proxy HTTP 200 |
 
-Last verified: 24 September 2026 — run `node tools/smoke-test.js` from `backend/` (needs MongoDB + the API on :5000).
+Last verified: 25 September 2026 — from `backend/`, with MongoDB + the API on :5000, run
+`node tools/smoke-test.js` (business rules, 128 checks) and
+`node tools/contract-audit.js` (proves every GET payload contains the exact keys the React pages read).
+From `frontend/`, run `npm run check:auth` (17 checks) to guard the sign-out path: it fails
+loudly if `logout()` is ever moved back behind an awaited request, if a hard `window.location`
+redirect is reintroduced, or if the React Router v7 opt-ins are dropped.
 
 ## PHASE 1: Project Setup & Architecture
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './Icon';
 
 export const LoadingScreen = () => (
   <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -26,18 +27,21 @@ export const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, conf
       <div className="modal-content modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">{title}</h3>
-          <button onClick={onClose} className="btn-icon btn-secondary rounded-full hover:bg-gray-100">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button
+            type="button"
+            aria-label="Close dialog"
+            onClick={onClose}
+            className="btn-icon btn-secondary rounded-full hover:bg-gray-100"
+          >
+            <Icon name="x" size={20} />
           </button>
         </div>
         <div className="modal-body">
           <p className="text-gray-600">{message}</p>
         </div>
         <div className="modal-footer">
-          <button onClick={onClose} className="btn btn-secondary">{cancelText}</button>
-          <button onClick={onConfirm} className={`btn ${isDangerous ? 'btn-danger' : 'btn-primary'}`}>
+          <button type="button"  onClick={onClose} className="btn btn-secondary">{cancelText}</button>
+          <button type="button"  onClick={onConfirm} className={`btn ${isDangerous ? 'btn-danger' : 'btn-primary'}`}>
             {confirmText}
           </button>
         </div>
@@ -81,14 +85,14 @@ export const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         Page {currentPage} of {totalPages}
       </p>
       <div className="flex items-center gap-1">
-        <button
+        <button type="button" 
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           className="btn btn-secondary btn-sm"
         >
           Previous
         </button>
-        <button
+        <button type="button" 
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           className="btn btn-secondary btn-sm ml-2"
@@ -118,7 +122,7 @@ export const SearchInput = ({ value, onChange, placeholder = 'Search...' }) => (
 export const PageHeader = ({ title, subtitle, actions }) => (
   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 break-words">{title}</h1>
       {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
     </div>
     {actions && <div className="mt-4 sm:mt-0">{actions}</div>}

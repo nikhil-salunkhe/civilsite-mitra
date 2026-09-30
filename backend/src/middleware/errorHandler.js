@@ -48,6 +48,22 @@ const errorHandler = (err, req, res, next) => {
     err = new ApiError('Token expired', 401);
   }
 
+  // MongoDB connectivity problems (transient TLS blips to Atlas, network
+  // switches, VPN changes) must surface as a friendly, retryable message -
+  // never as raw OpenSSL/mongoose internals in the UI. The original error is
+  // still logged above for operators.
+  const dbUnavailable =
+    err.name === 'MongoServerSelectionError' ||
+    err.name === 'MongooseServerSelectionError' ||
+    err.name === 'MongoNetworkError' ||
+    err.name === 'MongoNetworkTimeoutError' ||
+    (typeof err.message === 'string' &&
+      /SSL alert|Server selection timed out|querySelection|socket was unexpectedly closed|connection timed out|MongoServerSelectionError/i.test(err.message));
+
+  if (dbUnavailable) {
+    err = new ApiError('Database is temporarily unreachable. Please try again in a few seconds.', 503);
+  }
+
   // Send response
   res.status(err.statusCode).json({
     success: false,

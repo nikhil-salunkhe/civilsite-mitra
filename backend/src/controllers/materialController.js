@@ -38,6 +38,7 @@ const createMaterial = asyncHandler(async (req, res) => {
   const {
     name, category, vendor, vendorName, quantity, unit, rate,
     purchaseDate, invoiceNumber, paidAmount, notes, document,
+    openingStock, minStockLevel, trackStock,
   } = req.body;
 
   if (!name || !category || !quantity || !unit || !rate) {
@@ -68,6 +69,12 @@ const createMaterial = asyncHandler(async (req, res) => {
     document: document || null,
   });
 
+  // Optional stock-tracking fields. Only meaningful when trackStock is on;
+  // expense-only projects leave them at 0/false and the stock maths ignores them.
+  if (openingStock !== undefined) material.openingStock = Number(openingStock) || 0;
+  if (minStockLevel !== undefined) material.minStockLevel = Number(minStockLevel) || 0;
+  if (trackStock !== undefined) material.trackStock = !!trackStock;
+
   await material.save();
 
   res.status(201).json({
@@ -92,6 +99,7 @@ const updateMaterial = asyncHandler(async (req, res) => {
   const {
     name, category, vendor, vendorName, quantity, unit, rate,
     purchaseDate, invoiceNumber, paidAmount, notes, document,
+    openingStock, minStockLevel, trackStock,
   } = req.body;
 
   if (name) material.name = name;
@@ -110,6 +118,9 @@ const updateMaterial = asyncHandler(async (req, res) => {
   }
   if (notes !== undefined) material.notes = notes;
   if (document !== undefined) material.document = document;
+  if (openingStock !== undefined) material.openingStock = Number(openingStock) || 0;
+  if (minStockLevel !== undefined) material.minStockLevel = Number(minStockLevel) || 0;
+  if (trackStock !== undefined) material.trackStock = !!trackStock;
 
   // Recalculate total
   material.totalAmount = material.quantity * material.rate;

@@ -12,6 +12,8 @@ const VendorPayment = require('../models/VendorPayment');
 const Worker = require('../models/Worker');
 const WorkerPayment = require('../models/WorkerPayment');
 const Progress = require('../models/Progress');
+const WorkerAttendance = require('../models/WorkerAttendance');
+const MaterialUsage = require('../models/MaterialUsage');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
@@ -19,6 +21,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { ApiError } = require('../middleware/errorHandler');
 const { ACCOUNT_STATUS, USER_ROLES } = require('../config/constants');
 const { calculateSystemFinancialSummary, calculateEngineerFinancialSummary, toObjectId } = require('../services/financialService');
+const { escapeRegex } = require('../utils/query');
 const crypto = require('crypto');
 
 // Generate secure temporary password
@@ -91,11 +94,12 @@ const getEngineers = asyncHandler(async (req, res) => {
   const query = { role: USER_ROLES.ENGINEER };
 
   if (search) {
+    const s = escapeRegex(search);
     query.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
-      { mobile: { $regex: search, $options: 'i' } },
-      { company: { $regex: search, $options: 'i' } },
+      { name: { $regex: s, $options: 'i' } },
+      { email: { $regex: s, $options: 'i' } },
+      { mobile: { $regex: s, $options: 'i' } },
+      { company: { $regex: s, $options: 'i' } },
     ];
   }
 
@@ -400,10 +404,11 @@ const getAllSites = asyncHandler(async (req, res) => {
   const query = { isArchived: false };
 
   if (search) {
+    const s = escapeRegex(search);
     query.$or = [
-      { siteName: { $regex: search, $options: 'i' } },
-      { ownerName: { $regex: search, $options: 'i' } },
-      { city: { $regex: search, $options: 'i' } },
+      { siteName: { $regex: s, $options: 'i' } },
+      { ownerName: { $regex: s, $options: 'i' } },
+      { city: { $regex: s, $options: 'i' } },
     ];
   }
 
@@ -592,6 +597,8 @@ const deleteEngineer = asyncHandler(async (req, res) => {
       vendorPayments: VendorPayment,
       workers: Worker,
       workerPayments: WorkerPayment,
+      workerAttendance: WorkerAttendance,
+      materialUsage: MaterialUsage,
       progress: Progress,
     };
     await Promise.all(

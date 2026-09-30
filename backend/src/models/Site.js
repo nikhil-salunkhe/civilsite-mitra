@@ -53,6 +53,39 @@ const siteSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // ---------------------------------------------------------------- location
+    // Optional geo-tag captured on site creation (Google Maps picker or the
+    // device GPS). Every field is optional so sites created before this feature
+    // keep working unchanged, and a site can always be saved without a pin.
+    latitude: {
+      type: Number,
+      min: [-90, 'Latitude must be between -90 and 90'],
+      max: [90, 'Latitude must be between -90 and 90'],
+      default: null,
+    },
+    longitude: {
+      type: Number,
+      min: [-180, 'Longitude must be between -180 and 180'],
+      max: [180, 'Longitude must be between -180 and 180'],
+      default: null,
+    },
+    // Human-readable address returned by reverse geocoding, e.g.
+    // "Patan, Gujarat 384265, India". Shown on the site header and in reports.
+    locationLabel: {
+      type: String,
+      trim: true,
+    },
+    // Provenance of the pin - useful in an audit trail when two engineers
+    // disagree about where a site actually is.
+    geoSource: {
+      type: String,
+      enum: ['gps', 'map', 'manual', null],
+      default: null,
+    },
+    locationCapturedAt: {
+      type: Date,
+      default: null,
+    },
     // Construction details
     totalArea: {
       type: Number,

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { validate, siteSchema, paymentSchema, expenseSchema } = require('../validators');
 const siteController = require('../controllers/siteController');
 const {
   getPayments, createPayment, updatePayment, deletePayment
@@ -17,7 +18,13 @@ const {
   getMaterials, createMaterial, updateMaterial, deleteMaterial
 } = require('../controllers/materialController');
 const {
-  getVendors, createVendor, updateVendor, deleteVendor
+  getMaterialUsage, createMaterialUsage, updateMaterialUsage, deleteMaterialUsage, getMaterialStock
+} = require('../controllers/materialUsageController');
+const {
+  getAttendance, markAttendance, bulkMarkAttendance, updateAttendance, deleteAttendance, getAttendanceSummary
+} = require('../controllers/workerAttendanceController');
+const {
+  getVendors, createVendor, updateVendor, deleteVendor, getVendorLedger
 } = require('../controllers/vendorController');
 const {
   getVendorPayments, createVendorPayment, deleteVendorPayment
@@ -51,7 +58,7 @@ router.param('siteId', loadSite);
 
 // Site routes
 router.get('/', siteController.getSites);
-router.post('/', siteController.createSite);
+router.post('/', validate(siteSchema), siteController.createSite);
 router.get('/summary', siteController.getSiteSummary);
 router.get('/latest', siteController.getLatestSite);
 
@@ -71,7 +78,7 @@ router.patch('/:siteId/progress', updateProgress);
 
 // Payments
 router.get('/:siteId/payments', getPayments);
-router.post('/:siteId/payments', createPayment);
+router.post('/:siteId/payments', validate(paymentSchema), createPayment);
 router.put('/:siteId/payments/:id', updatePayment);
 router.delete('/:siteId/payments/:id', deletePayment);
 
@@ -100,6 +107,23 @@ router.post('/:siteId/materials', createMaterial);
 router.put('/:siteId/materials/:id', updateMaterial);
 router.delete('/:siteId/materials/:id', deleteMaterial);
 
+// Material usage + derived stock (read-only projection over purchases/usage)
+router.get('/:siteId/material-stock', getMaterialStock);
+router.get('/:siteId/material-usage', getMaterialUsage);
+router.post('/:siteId/material-usage', createMaterialUsage);
+router.put('/:siteId/material-usage/:id', updateMaterialUsage);
+router.delete('/:siteId/material-usage/:id', deleteMaterialUsage);
+
+// Worker attendance.
+// 'bulk' and 'summary' are declared BEFORE '/:id' so Express does not treat
+// those literal segments as an attendance id.
+router.get('/:siteId/attendance/summary', getAttendanceSummary);
+router.post('/:siteId/attendance/bulk', bulkMarkAttendance);
+router.get('/:siteId/attendance', getAttendance);
+router.post('/:siteId/attendance', markAttendance);
+router.put('/:siteId/attendance/:id', updateAttendance);
+router.delete('/:siteId/attendance/:id', deleteAttendance);
+
 // Vendor payments -- declared BEFORE '/:siteId/vendors/:id' (same reason as above)
 router.get('/:siteId/vendor-payments', getVendorPayments);
 router.post('/:siteId/vendor-payments', createVendorPayment);
@@ -110,10 +134,12 @@ router.get('/:siteId/vendors', getVendors);
 router.post('/:siteId/vendors', createVendor);
 router.put('/:siteId/vendors/:id', updateVendor);
 router.delete('/:siteId/vendors/:id', deleteVendor);
+// Read-only ledger (purchases as debit, payments as credit, running balance)
+router.get('/:siteId/vendors/:id/ledger', getVendorLedger);
 
 // Expenses
 router.get('/:siteId/expenses', getExpenses);
-router.post('/:siteId/expenses', createExpense);
+router.post('/:siteId/expenses', validate(expenseSchema), createExpense);
 router.put('/:siteId/expenses/:id', updateExpense);
 router.delete('/:siteId/expenses/:id', deleteExpense);
 

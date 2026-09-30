@@ -64,7 +64,7 @@ export const AdminReports = () => {
       <PageHeader
         title="Reports & Analytics"
         subtitle="System-wide business overview"
-        actions={hasFilters ? <button onClick={reset} className="btn btn-secondary">Reset Filters</button> : null}
+        actions={hasFilters ? <button type="button"  onClick={reset} className="btn btn-secondary">Reset Filters</button> : null}
       />
 
       <div className="card">

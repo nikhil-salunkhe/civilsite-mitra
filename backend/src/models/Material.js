@@ -86,6 +86,31 @@ const materialSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // ---------------------------------------------------------------------
+    // OPTIONAL STOCK TRACKING
+    // ---------------------------------------------------------------------
+    // A purchase row is a money record first. These three fields let the same
+    // row also participate in stock maths for engineers who want it:
+    //
+    //   currentStock = openingStock + purchased - used
+    //
+    // `trackStock` defaults to false so expense-only projects ignore stock
+    // entirely and no existing purchase changes behaviour.
+    openingStock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Opening stock cannot be negative'],
+    },
+    minStockLevel: {
+      type: Number,
+      default: 0,
+      min: [0, 'Minimum stock level cannot be negative'],
+    },
+    trackStock: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

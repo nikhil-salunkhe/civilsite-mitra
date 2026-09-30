@@ -175,7 +175,7 @@ export const GlobalRecords = ({ module: moduleName }) => {
                     <td className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {cfg.download && (
-                          <button
+                          <button type="button" 
                             className="btn btn-secondary btn-sm"
                             disabled={busy === row._id}
                             onClick={() => downloadRow(row)}

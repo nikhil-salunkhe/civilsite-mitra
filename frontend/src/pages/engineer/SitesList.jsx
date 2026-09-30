@@ -7,7 +7,9 @@ import { PageHeader, SearchInput, Pagination, StatusBadge } from '../../componen
 export const SitesList = () => {
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  // Deep-link support: /sites?search=... lets the dashboard search box jump
+  // straight here with the query pre-filled. Default behaviour is unchanged.
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({});
@@ -16,7 +18,7 @@ export const SitesList = () => {
   useEffect(() => {
     api.get('/sites', { params: { page, limit: 10, search: search || undefined, status: status || undefined } })
       .then(({ data }) => { setSites(data.data.sites || []); setPagination(data.data.pagination); })
-      .catch(() => toast.error('Failed to load sites'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load sites'))
       .finally(() => setLoading(false));
   }, [page, search, status]);
 
@@ -28,7 +30,7 @@ export const SitesList = () => {
         title="My Construction Sites"
         subtitle="Manage your construction projects"
         actions={
-          <button onClick={() => navigate('/sites/create')} className="btn btn-primary">
+          <button type="button"  onClick={() => navigate('/sites/create')} className="btn btn-primary">
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             Add New Site
           </button>
@@ -55,7 +57,7 @@ export const SitesList = () => {
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Yet</h3>
               <p className="text-gray-500 mb-4">Start managing your construction projects by creating your first site.</p>
-              <button onClick={() => navigate('/sites/create')} className="btn btn-primary">Create Your First Site</button>
+              <button type="button"  onClick={() => navigate('/sites/create')} className="btn btn-primary">Create Your First Site</button>
             </div>
           ) : (
             <div className="table-container">
@@ -96,7 +98,7 @@ export const SitesList = () => {
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Link to={`/sites/${site._id}`} className="btn btn-secondary btn-sm">View</Link>
-                          <button onClick={() => navigate('/sites/create', { state: { editSite: site } })} className="btn btn-secondary btn-sm">Edit</button>
+                          <Link to={`/sites/${site._id}/edit`} className="btn btn-secondary btn-sm">Edit</Link>
                         </div>
                       </td>
                     </tr>

@@ -35,7 +35,7 @@ export const EngineersList = () => {
       });
       setEngineers(data.data.engineers);
       setPagination(data.data.pagination);
-    } catch { toast.error('Failed to load engineers'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to load engineers'); }
     finally { setLoading(false); }
   };
 
@@ -46,7 +46,7 @@ export const EngineersList = () => {
       await api.patch(`/admin/engineers/${id}/status`, { status: newStatus });
       toast.success(`Engineer ${newStatus.toLowerCase()}`);
       fetchEngineers();
-    } catch { toast.error('Failed to update status'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to update status'); }
   };
 
   const handleDelete = async () => {
@@ -64,7 +64,7 @@ export const EngineersList = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Engineer Management" subtitle="Manage registered engineers" actions={
-        <button onClick={() => navigate('/admin/engineers/create')} className="btn btn-primary">
+        <button type="button"  onClick={() => navigate('/admin/engineers/create')} className="btn btn-primary">
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Create Engineer
         </button>
@@ -134,7 +134,7 @@ export const EngineersList = () => {
                           <option value="BLOCKED">Block</option>
                           <option value="INACTIVE">Deactivate</option>
                         </select>
-                        <button onClick={() => setDeleteTarget(eng)} className="btn btn-danger btn-sm">Delete</button>
+                        <button type="button"  onClick={() => setDeleteTarget(eng)} className="btn btn-danger btn-sm">Delete</button>
                       </div>
                     </td>
                   </tr>

@@ -3,11 +3,57 @@ const Installment = require('../models/Installment');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { SITE_STATUS, DEFAULT_INSTALLMENTS } = require('../config/constants');
 const { findOwnedSite } = require('../utils/siteAccess');
+const { escapeRegex } = require('../utils/query');
 const {
   calculateSiteFinancialSummary,
   calculateEngineerFinancialSummary,
   round2,
 } = require('../services/financialService');
+
+/**
+ * Normalises the optional geo-tag sent by the Google Maps picker.
+ *
+ * Returns `{}` for an un-pinned site so `new Site({...spread})` / `Object.assign`
+ * leave the schema defaults (nulls) in place. When a pin IS present, the two
+ * halves of the coordinate pair are validated together: a latitude without a
+ * longitude is meaningless, so it is dropped rather than stored half-formed.
+ * Mirrors the Joi `siteSchema` rules in src/validators/index.js.
+ */
+const geoFields = (body = {}) => {
+  const hasLat = body.latitude !== undefined && body.latitude !== null && body.latitude !== '';
+  const hasLng = body.longitude !== undefined && body.longitude !== null && body.longitude !== '';
+
+  // Clearing a pin is intentional and supported (both explicitly null/empty).
+  if (!hasLat && !hasLng) {
+    return body.latitude === null || body.longitude === null
+      ? { latitude: null, longitude: null, locationLabel: '', geoSource: null, locationCapturedAt: null }
+      : {};
+  }
+
+  if (!hasLat || !hasLng) {
+    throw new ApiError('Latitude and longitude must be provided together', 400);
+  }
+
+  const latitude = Number(body.latitude);
+  const longitude = Number(body.longitude);
+
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new ApiError('Latitude must be a number between -90 and 90', 400);
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new ApiError('Longitude must be a number between -180 and 180', 400);
+  }
+
+  const source = ['gps', 'map', 'manual'].includes(body.geoSource) ? body.geoSource : 'map';
+
+  return {
+    latitude,
+    longitude,
+    locationLabel: (body.locationLabel || '').trim(),
+    geoSource: source,
+    locationCapturedAt: new Date(),
+  };
+};
 
 // GET /api/sites
 const getSites = asyncHandler(async (req, res) => {
@@ -33,22 +79,26 @@ const getSites = asyncHandler(async (req, res) => {
   }
 
   if (city) {
-    query.city = { $regex: city, $options: 'i' };
+    query.city = { $regex: escapeRegex(city), $options: 'i' };
   }
 
   if (search) {
+    const s = escapeRegex(search);
     query.$or = [
-      { siteName: { $regex: search, $options: 'i' } },
-      { ownerName: { $regex: search, $options: 'i' } },
-      { ownerMobile: { $regex: search, $options: 'i' } },
-      { city: { $regex: search, $options: 'i' } },
-      { address: { $regex: search, $options: 'i' } },
+      { siteName: { $regex: s, $options: 'i' } },
+      { ownerName: { $regex: s, $options: 'i' } },
+      { ownerMobile: { $regex: s, $options: 'i' } },
+      { city: { $regex: s, $options: 'i' } },
+      { address: { $regex: s, $options: 'i' } },
     ];
   }
 
   const pageNum = Math.max(1, parseInt(page, 10));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-  const sort = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+  // Whitelisted sort keys - never pass raw user input to the sort spec.
+  const allowedSort = ['createdAt', 'siteName', 'status', 'totalArea', 'startDate'];
+  const sortKey = allowedSort.includes(sortBy) ? sortBy : 'createdAt';
+  const sort = { [sortKey]: sortOrder === 'asc' ? 1 : -1 };
 
   const [sites, total] = await Promise.all([
     Site.find(query).sort(sort).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
@@ -89,6 +139,10 @@ const createSite = asyncHandler(async (req, res) => {
     status,
     notes,
     installments,
+    latitude,
+    longitude,
+    locationLabel,
+    geoSource,
   } = req.body;
 
   if (!siteName || !ownerName || !ownerMobile || !address || !city || totalArea === undefined || ratePerArea === undefined) {
@@ -129,6 +183,7 @@ const createSite = asyncHandler(async (req, res) => {
     expectedCompletionDate: expectedCompletionDate ? new Date(expectedCompletionDate) : null,
     status: Object.values(SITE_STATUS).includes(status) ? status : SITE_STATUS.PLANNED,
     notes: notes || '',
+    ...geoFields(req.body),
   });
 
   await site.save();
@@ -198,7 +253,6 @@ const updateSite = asyncHandler(async (req, res) => {
     totalArea, areaUnit, ratePerArea, engineerCharges,
     startDate, expectedCompletionDate, status, notes,
   } = req.body;
-
   if (siteName) site.siteName = siteName;
   if (ownerName) site.ownerName = ownerName;
   if (ownerMobile) site.ownerMobile = ownerMobile;
@@ -241,6 +295,11 @@ const updateSite = asyncHandler(async (req, res) => {
 
   // Project value follows area x rate - always recalculated server side.
   site.estimatedProjectCost = round2(site.totalArea * site.ratePerArea);
+  // Geo-tag: only touched when the request actually carries geo keys, so an
+  // edit that has nothing to do with location never wipes an existing pin.
+  Object.assign(site, geoFields(req.body));
+
+
 
   await site.save();
 
@@ -273,6 +332,8 @@ const deleteSite = asyncHandler(async (req, res) => {
     require('../models/Activity'),
     require('../models/Document'),
     require('../models/Progress'),
+    require('../models/WorkerAttendance'),
+    require('../models/MaterialUsage'),
   ];
 
   await Promise.all(models.map((Model) => Model.deleteMany({ site: site._id })));

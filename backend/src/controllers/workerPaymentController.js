@@ -34,33 +34,44 @@ const getWorkerPayments = asyncHandler(async (req, res) => {
 // Create worker payment
 const createWorkerPayment = asyncHandler(async (req, res) => {
   const { worker, date, workDays, dailyWage, paymentMode, paymentDate, notes } = req.body;
+  // Money actually handed over at creation time. `amount` is accepted as an
+  // alias so simple "Pay ₹X" clients don't have to know the canonical name.
+  const paidRaw = req.body.paidAmount ?? req.body.amount;
 
-  if (!worker || !workDays || !dailyWage) {
+  if (!worker || workDays === undefined || workDays === null || dailyWage === undefined || dailyWage === null) {
     throw new ApiError('Worker, work days, and daily wage are required', 400);
   }
+
+  const days = Number(workDays);
+  const wage = Number(dailyWage);
+  if (Number.isNaN(days) || days < 0) throw new ApiError('Work days must be zero or more', 400);
+  if (Number.isNaN(wage) || wage < 0) throw new ApiError('Daily wage must be zero or more', 400);
+
+  const paid = paidRaw === undefined || paidRaw === null || paidRaw === '' ? 0 : Number(paidRaw);
+  if (Number.isNaN(paid) || paid < 0) throw new ApiError('Paid amount must be zero or more', 400);
 
   const workerData = await require('../models/Worker').findById(worker);
   if (!workerData || workerData.site.toString() !== req.params.siteId) {
     throw new ApiError('Invalid worker for this site', 400);
   }
 
-  const totalAmount = workDays * dailyWage;
-
   const workerPayment = new WorkerPayment({
     worker,
     site: req.params.siteId,
     engineer: req.userId,
     date: date ? new Date(date) : new Date(),
-    workDays,
-    dailyWage,
-    totalAmount,
-    paidAmount: 0,
-    pendingAmount: totalAmount,
+    workDays: days,
+    dailyWage: wage,
+    totalAmount: days * wage,
+    paidAmount: paid,
     paymentMode: paymentMode || null,
-    paymentDate: paymentDate ? new Date(paymentDate) : null,
-    status: 'Pending',
+    paymentDate: paymentDate ? new Date(paymentDate) : (paid > 0 ? new Date() : null),
     notes: notes || '',
   });
+
+  // Derives pendingAmount + Paid/Partial/Pending status so a payment recorded
+  // with cash in hand is immediately consistent with the model's rules.
+  workerPayment.calculateTotals();
 
   await workerPayment.save();
 

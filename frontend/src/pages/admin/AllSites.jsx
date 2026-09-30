@@ -15,7 +15,7 @@ export const AllSites = () => {
   useEffect(() => {
     api.get('/admin/sites', { params: { page, limit: 15, search: search || undefined, status: status || undefined } })
       .then(({ data }) => { setSites(data.data.sites || []); setPagination(data.data.pagination); })
-      .catch(() => toast.error('Failed to load sites'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load sites'))
       .finally(() => setLoading(false));
   }, [page, search, status]);
 

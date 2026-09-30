@@ -21,6 +21,12 @@ const connectDB = async () => {
       console.warn('MongoDB disconnected');
     });
 
+    // Atlas links can drop on network/VPN switches; the driver reconnects on
+    // the next operation - log it so transient outages are visible.
+    mongoose.connection.on('reconnected', () => {
+      console.log('MongoDB reconnected');
+    });
+
     return conn;
   } catch (error) {
     console.error(`Error connecting to MongoDB: ${error.message}`);

@@ -1,12 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  IndianRupee,
+  CalendarClock,
+  Users,
+  CalendarCheck,
+  Package,
+  ClipboardList,
+  Store,
+  Receipt,
+  Activity,
+  FileText,
+  FolderOpen,
+} from 'lucide-react';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { ConfirmDialog, StatusBadge } from '../../components/UI';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { money, dateFmt } from './siteTabs/shared';
 import TabPanel from './siteTabs';
 
-const TAB_NAMES = ['Overview', 'Payments', 'Installments', 'Workers', 'Materials', 'Vendors', 'Expenses', 'Activities', 'Reports', 'Documents'];
+const TAB_NAMES = ['Overview', 'Payments', 'Installments', 'Workers', 'Attendance', 'Materials', 'Material Usage', 'Vendors', 'Expenses', 'Activities', 'Reports', 'Documents'];
+
+// One lucide icon per section - the icon + label pairing is what makes a
+// vertical tab rail scannable at a glance (industry-standard navigation).
+const TAB_ICONS = {
+  Overview: LayoutDashboard,
+  Payments: IndianRupee,
+  Installments: CalendarClock,
+  Workers: Users,
+  Attendance: CalendarCheck,
+  Materials: Package,
+  'Material Usage': ClipboardList,
+  Vendors: Store,
+  Expenses: Receipt,
+  Activities: Activity,
+  Reports: FileText,
+  Documents: FolderOpen,
+};
+
+// URL-friendly tab id: "Material Usage" -> "material-usage".
+const tabSlug = (name) => name.toLowerCase().replace(/\s+/g, '-');
 
 export function SiteDashboard() {
   const { id: siteId } = useParams();
@@ -14,9 +49,25 @@ export function SiteDashboard() {
   const [site, setSite] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('Overview');
+  // The active tab lives in the URL (?tab=...) so every section is deep-linkable,
+  // survives a refresh, and browser back/forward moves between sections.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab =
+    TAB_NAMES.find((t) => tabSlug(t) === (searchParams.get('tab') || '')) || 'Overview';
+
+  const selectTab = (name) => {
+    const next = new URLSearchParams(searchParams);
+    if (name === 'Overview') next.delete('tab');
+    else next.set('tab', tabSlug(name));
+    setSearchParams(next, { replace: true });
+  };
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Distinguishes "this site really is not yours" from "the call failed"
+  // (network blip / database temporarily unreachable) so the empty state can
+  // offer Retry instead of a misleading "Site not found".
+  const [loadError, setLoadError] = useState('');
+  const [notFound, setNotFound] = useState(false);
 
   const load = () => {
     api
@@ -24,9 +75,29 @@ export function SiteDashboard() {
       .then(({ data }) => {
         setSite(data.data?.site || null);
         setSummary(data.data?.summary || null);
+        setLoadError('');
+        setNotFound(false);
       })
-      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load site'))
+      .catch((err) => {
+        const status = err.response?.status;
+        const msg = err.response?.data?.message;
+        if (status === 404) {
+          setNotFound(true);
+          setLoadError(msg || 'Site not found');
+          toast.error(msg || 'Site not found');
+          return;
+        }
+        setLoadError(msg || 'Could not reach the server. Please check your connection and try again.');
+        toast.error(msg || 'Failed to load site');
+      })
       .finally(() => setLoading(false));
+  };
+
+  const retryLoad = () => {
+    setLoading(true);
+    setLoadError('');
+    setNotFound(false);
+    load();
   };
 
   useEffect(() => {
@@ -74,8 +145,20 @@ export function SiteDashboard() {
   if (!site) {
     return (
       <div className="card text-center py-12">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Site not found</h3>
-        <p className="text-gray-500">This site does not exist or you do not have access to it.</p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          {notFound ? 'Site not found' : 'Could not load this site'}
+        </h3>
+        <p className="text-gray-500 mb-5">
+          {loadError || 'This site does not exist or you do not have access to it.'}
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <button type="button" className="btn btn-primary btn-sm" onClick={retryLoad}>
+            Retry
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => navigate('/sites')}>
+            Back to Sites
+          </button>
+        </div>
       </div>
     );
   }
@@ -84,9 +167,9 @@ export function SiteDashboard() {
   const cards = [
     { label: 'Project Value', value: money(fin.projectValue ?? site.estimatedProjectCost) },
     { label: 'Amount Received', value: money(fin.totalReceived ?? fin.received), cls: 'text-success-600' },
-    { label: 'Pending Amount', value: money(fin.pendingAmount ?? fin.pending), cls: 'text-danger-600' },
+    { label: 'Pending Amount', value: money(fin.pendingReceivable ?? fin.pendingAmount ?? fin.pending), cls: 'text-danger-600' },
     { label: 'Total Investment', value: money(fin.totalInvestment), cls: 'text-warning-600' },
-    { label: 'Estimated Profit', value: money(fin.estimatedProfit), cls: 'text-green-600' },
+    { label: 'Estimated Profit', value: money(fin.estimatedProfit), cls: 'text-success-600' },
   ];
 
   return (
@@ -95,7 +178,7 @@ export function SiteDashboard() {
       <div className="card">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{site.siteName}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 break-words">{site.siteName}</h1>
             <p className="text-sm text-gray-500 mt-1">
               Owner: <span className="font-medium text-gray-700">{site.ownerName}</span>
               {' · '}{site.city}{site.state ? `, ${site.state}` : ''}
@@ -107,7 +190,7 @@ export function SiteDashboard() {
               {site.expectedCompletionDate ? ` · Expected ${dateFmt(site.expectedCompletionDate)}` : ''}
             </p>
           </div>
-          <div className="text-right">
+          <div className="sm:text-right">
             <p className="text-xs text-gray-500 mb-1">Overall Progress</p>
             <div className="flex items-center gap-2">
               <div className="w-40 bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -129,18 +212,18 @@ export function SiteDashboard() {
           </div>
           <div className="flex flex-wrap gap-2">
             {site.status !== 'Completed' ? (
-              <button onClick={markComplete} disabled={busy} className="btn btn-secondary btn-sm">
+              <button type="button"  onClick={markComplete} disabled={busy} className="btn btn-secondary btn-sm">
                 Mark Complete
               </button>
             ) : (
-              <button onClick={reopenSite} disabled={busy} className="btn btn-secondary btn-sm">
+              <button type="button"  onClick={reopenSite} disabled={busy} className="btn btn-secondary btn-sm">
                 Reopen Site
               </button>
             )}
-            <button onClick={toggleArchive} disabled={busy} className="btn btn-secondary btn-sm">
+            <button type="button"  onClick={toggleArchive} disabled={busy} className="btn btn-secondary btn-sm">
               {site.isArchived ? 'Restore Site' : 'Archive Site'}
             </button>
-            <button onClick={() => setConfirmDelete(true)} disabled={busy} className="btn btn-danger btn-sm">
+            <button type="button"  onClick={() => setConfirmDelete(true)} disabled={busy} className="btn btn-danger btn-sm">
               Delete Site
             </button>
           </div>
@@ -157,27 +240,66 @@ export function SiteDashboard() {
         </div>
       </div>
 
-      {/* Tab navigation */}
-      <div className="card !py-0 overflow-x-auto">
-        <div className="flex gap-1 min-w-max">
-          {TAB_NAMES.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                tab === t
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+      {/* Tab rail: sticky vertical column with icons on desktop, horizontally
+          scrollable strip on mobile. Active tab mirrors into ?tab= for links. */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <nav
+          className="card !py-2 w-full lg:w-56 lg:shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+          aria-label="Site sections"
+        >
+          <p className="hidden lg:block px-3 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            Site Sections
+          </p>
+          <div
+            className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0"
+            role="tablist"
+          >
+            {TAB_NAMES.map((t) => {
+              const Icon = TAB_ICONS[t];
+              const active = tab === t;
+              return (
+                <button
+                  key={t}
+                  id={`site-tab-${tabSlug(t)}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={active}
+                  aria-controls={`site-tab-panel-${tabSlug(t)}`}
+                  onClick={() => selectTab(t)}
+                  className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/60 ${
+                    active
+                      ? 'bg-primary-50 text-primary-700 font-semibold shadow-sm'
+                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800 font-medium'
+                  }`}
+                >
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      active ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'
+                    }`}
+                    strokeWidth={2}
+                  />
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div
+          key={tab}
+          className="min-w-0 flex-1 w-full animate-fadeIn focus:outline-none"
+          role="tabpanel"
+          id={`site-tab-panel-${tabSlug(tab)}`}
+          aria-labelledby={`site-tab-${tabSlug(tab)}`}
+          tabIndex={0}
+        >
+          {/* onChanged refreshes the site summary. The boundary is per-tab:
+              one misbehaving panel cannot blank the page. */}
+          <ErrorBoundary compact>
+            <TabPanel tab={tab} siteId={siteId} site={site} summary={summary} onChanged={load} />
+          </ErrorBoundary>
         </div>
       </div>
-
-      {/* Active tab panel - onChanged refreshes the site summary */}
-      <TabPanel tab={tab} siteId={siteId} site={site} summary={summary} onChanged={load} />
 
       <ConfirmDialog
         isOpen={confirmDelete}

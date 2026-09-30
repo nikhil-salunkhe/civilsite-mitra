@@ -77,6 +77,21 @@ if (process.env.NODE_ENV === 'development') {
 // Serve uploaded files
 app.use('/uploads', express.static(config.upload.path));
 
+// Coerce paging query params: non-numeric or negative page/limit become safe
+// defaults so a typo'd URL can never produce a 500 from Mongo's skip/limit.
+app.use((req, res, next) => {
+  if (req.query) {
+    for (const key of ['page', 'limit']) {
+      const raw = req.query[key];
+      if (raw !== undefined) {
+        const n = parseInt(Array.isArray(raw) ? raw[0] : raw, 10);
+        req.query[key] = String(Number.isFinite(n) && n > 0 ? n : 1);
+      }
+    }
+  }
+  next();
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.status(200).json({

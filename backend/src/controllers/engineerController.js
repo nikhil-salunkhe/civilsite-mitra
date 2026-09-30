@@ -7,6 +7,7 @@ const Document = require('../models/Document');
 const Site = require('../models/Site');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ApiError } = require('../middleware/errorHandler');
+const { escapeRegex } = require('../utils/query');
 
 // Whitelisted modules for the engineer's global sidebar pages (spec section 38).
 // Every query is scoped to the authenticated engineer - multi-tenant rule.
@@ -34,7 +35,7 @@ const getGlobalRecords = asyncHandler(async (req, res) => {
   if (siteId) query.site = siteId;
 
   if (search) {
-    query.$or = mod.search.map((field) => ({ [field]: { $regex: search, $options: 'i' } }));
+    query.$or = mod.search.map((field) => ({ [field]: { $regex: escapeRegex(search), $options: 'i' } }));
   }
 
   const pageNum = Math.max(1, parseInt(page) || 1);

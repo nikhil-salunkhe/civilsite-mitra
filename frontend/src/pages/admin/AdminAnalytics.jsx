@@ -20,7 +20,7 @@ export const AdminAnalytics = () => {
   useEffect(() => {
     Promise.all([api.get('/admin/reports'), api.get('/admin/dashboard')])
       .then(([r, d]) => { setReports(r.data.data); setDashboard(d.data.data); })
-      .catch(() => toast.error('Failed to load analytics'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load analytics'))
       .finally(() => setLoading(false));
   }, []);
 

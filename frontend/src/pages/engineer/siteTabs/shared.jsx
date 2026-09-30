@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
+import { Icon } from '../../../components/Icon';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers (self-contained so tabs never depend on uncertain utils)
@@ -39,7 +40,7 @@ export const useList = (siteId, basePath) => {
     api
       .get(`/sites/${siteId}/${basePath}`)
       .then(({ data }) => setItems(extractList(data)))
-      .catch(() => toast.error('Failed to load records'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load records'))
       .finally(() => setLoading(false));
   }, [siteId, basePath]);
 
@@ -58,7 +59,9 @@ export const Modal = ({ title, onClose, onSubmit, submitting, children }) => (
     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
         <h3 className="modal-title">{title}</h3>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>✕</button>
+        <button type="button" aria-label="Close" className="btn btn-icon btn-secondary btn-sm" onClick={onClose}>
+          <Icon name="x" size={16} />
+        </button>
       </div>
       <form onSubmit={onSubmit}>
         <div className="modal-body">{children}</div>

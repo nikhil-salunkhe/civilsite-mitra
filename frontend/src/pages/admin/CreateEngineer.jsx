@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { PageHeader, FormSection, FormGroup, FormRow } from '../../components/UI';
+import { Icon } from '../../components/Icon';
 
 const STATUSES = ['ACTIVE', 'SUSPENDED', 'BLOCKED', 'INACTIVE'];
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -47,7 +48,7 @@ export const CreateEngineer = () => {
           notes: e.notes || '',
         });
       })
-      .catch(() => toast.error('Failed to load engineer'))
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load engineer'))
       .finally(() => setFetching(false));
   }, [id, isEdit]);
 
@@ -133,7 +134,9 @@ export const CreateEngineer = () => {
     return (
       <div className="max-w-2xl mx-auto">
                 <div className="card text-center">
-          <div className="mx-auto w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-2xl font-bold">✓</div>
+          <div className="mx-auto w-14 h-14 rounded-full bg-success-100 text-success-600 flex items-center justify-center">
+            <Icon name="check" size={28} strokeWidth={2.2} />
+          </div>
           <h2 className="text-xl font-semibold mt-4">Engineer Created Successfully</h2>
           <dl className="mt-6 text-left max-w-sm mx-auto space-y-3 text-sm">
             <div className="flex justify-between gap-4">

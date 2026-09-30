@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -8,7 +8,7 @@ export const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   // Forgot-password flow (spec section 3): request -> (dev token) -> reset.
@@ -20,9 +20,11 @@ export const LoginPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
+  // Already signed in (e.g. after a browser Back to /login). Hand the decision
+  // to the router with <Navigate> instead of calling navigate() during render,
+  // which is a side effect in the render phase and can loop.
   if (isAuthenticated) {
-    navigate('/admin/dashboard');
-    return null;
+    return <Navigate to={user?.role === 'SUPER_ADMIN' ? '/admin/dashboard' : '/dashboard'} replace />;
   }
 
   const handleSubmit = async (e) => {

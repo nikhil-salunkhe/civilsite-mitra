@@ -2,7 +2,11 @@ const Site = require('../models/Site');
 const User = require('../models/User');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { findOwnedSite } = require('../utils/siteAccess');
-const { assembleSiteReportData, assembleEngineerReportData } = require('../services/reportService');
+const {
+  assembleSiteReportData,
+  assembleEngineerReportData,
+  buildReportMeta,
+} = require('../services/reportService');
 const { buildSiteReportPdf } = require('../reports/siteReport');
 const { buildSiteWorkbook } = require('../exports/excelExport');
 const { safeFileSlug, toIsoDate } = require('../utils/format');
@@ -25,7 +29,20 @@ const { safeFileSlug, toIsoDate } = require('../utils/format');
 const loadReportData = async (req) => {
   const site = await findOwnedSite(req);
 
-  const data = await assembleSiteReportData(site);
+  // Optional record date filter for reports AND all exports (spec section 22).
+  const { from, to } = req.query;
+  const filters = {};
+  for (const [key, value] of [['from', from], ['to', to]]) {
+    if (value) {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new ApiError(`Invalid ${key} date`, 400);
+      }
+      filters[key] = value;
+    }
+  }
+
+  const data = await assembleSiteReportData(site, filters);
 
   const owner = await User.findById(site.engineer).select('name company email mobile').lean();
   if (owner) {
@@ -67,15 +84,26 @@ const getReports = asyncHandler(async (req, res) => {
       },
       engineer: data.engineer,
       summary: data.summary,
+      dateFilter: data.dateFilter,
+      meta: buildReportMeta(data),
       installments: data.installments,
       payments: data.payments,
       workers: data.workers,
       workerPayments: data.workerPayments,
+      attendance: data.attendance,
+      attendanceSummary: data.attendanceSummary,
+      attendanceTotals: data.attendanceTotals,
       materials: data.materials,
+      materialUsage: data.materialUsage,
+      materialStock: data.materialStock,
       vendors: data.vendors,
       vendorPayments: data.vendorPayments,
       expenses: data.expenses,
       activities: data.activities,
+      documents: data.documents,
+      documentsCount: data.documentsCount,
+      progress: data.progress,
+      overallProgress: data.overallProgress,
       generatedAt: data.generatedAt,
       availableReports: [
         { key: 'site', label: 'Site Report', format: 'pdf' },

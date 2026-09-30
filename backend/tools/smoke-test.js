@@ -196,6 +196,9 @@ async function main() {
   await expect('Engineer A login', Boolean(tokenA), loginA.data?.message || `status ${loginA.status}`);
   if (!tokenA) throw new Error('Cannot continue without engineer A login');
 
+  // Engineer B's token is reused later by the cross-tenant attendance checks.
+  let tokenB = null;
+
   // --- Site creation by engineer A ---
   {
     const body = {
@@ -214,6 +217,47 @@ async function main() {
     createdIds.site = site?._id;
     await expect('Engineer A creates site', r.status < 300 && Boolean(createdIds.site),
       r.data?.message || `status ${r.status}`);
+  }
+
+  // --- Site geo-tag (Google Maps / live location picker) -------------------
+  {
+    const G = { latitude: 18.5204, longitude: 73.8567, locationLabel: 'Pune, Maharashtra, India', geoSource: 'map' };
+    const r = await req('PUT', `/sites/${createdIds.site}`, { token: tokenA, body: G });
+    const site = r.data?.data?.site || r.data?.data;
+    await expect('Site accepts geo-tag', r.status < 300, r.data?.message || `status ${r.status}`);
+    await expect('Geo-tag persisted with source + timestamp',
+      Number(site?.latitude) === G.latitude
+      && Number(site?.longitude) === G.longitude
+      && site?.geoSource === 'map'
+      && Boolean(site?.locationCapturedAt),
+      `lat=${site?.latitude} lng=${site?.longitude} source=${site?.geoSource}`);
+
+    // GET /sites/:id is what the edit form prefills from.
+    const read = await req('GET', `/sites/${createdIds.site}`, { token: tokenA });
+    const shown = read.data?.data?.site || read.data?.data;
+    await expect('GET /sites/:id returns geo fields for edit prefill',
+      Number(shown?.latitude) === G.latitude && Number(shown?.longitude) === G.longitude,
+      `lat=${shown?.latitude} lng=${shown?.longitude}`);
+
+    // Half a coordinate pair must be rejected, never stored.
+    const half = await req('PUT', `/sites/${createdIds.site}`, { token: tokenA, body: { latitude: 12.345 } });
+    await expect('Half coordinate pair rejected with 400', half.status === 400, `status=${half.status}`);
+
+    // Out-of-range latitude must be rejected by the Joi boundary.
+    const oob = await req('PUT', `/sites/${createdIds.site}`, { token: tokenA, body: { latitude: 91, longitude: 10 } });
+    await expect('Out-of-range latitude rejected', oob.status >= 400 && oob.status < 500, `status=${oob.status}`);
+
+    // Clearing the pin is a supported, explicit action.
+    const cleared = await req('PUT', `/sites/${createdIds.site}`, {
+      token: tokenA, body: { latitude: null, longitude: null },
+    });
+    const clearedSite = cleared.data?.data?.site || cleared.data?.data;
+    await expect('Pin can be cleared',
+      cleared.status < 300 && clearedSite?.latitude == null && clearedSite?.longitude == null,
+      `lat=${clearedSite?.latitude} lng=${clearedSite?.longitude}`);
+
+    // Restore the pin so the report/export checks below see a geolocated site.
+    await req('PUT', `/sites/${createdIds.site}`, { token: tokenA, body: G });
   }
 
   // --- Admin sees engineer A and their site ---
@@ -243,7 +287,7 @@ async function main() {
   // --- Data isolation: engineer B cannot see engineer A's site ---
   if (createdIds.site) {
     const rB = await req('POST', '/auth/login', { body: { email: ENGINEER_B.email, password: NEW_PW_B } });
-    const tokenB = rB.data?.token || rB.data?.data?.token;
+    tokenB = rB.data?.token || rB.data?.data?.token;
     const r2 = await req('GET', `/sites/${createdIds.site}`, { token: tokenB });
     await expect('Cross-engineer site access blocked (404)', r2.status === 404, `status ${r2.status}`);
     const r3 = await req('GET', `/sites/${createdIds.site}/summary`, { token: tokenB });
@@ -319,6 +363,85 @@ async function main() {
       tokenA);
   }
 
+  // --- Material usage + derived stock projection ---
+  if (createdIds.site) {
+    const sid = createdIds.site;
+    const today = new Date().toISOString().slice(0, 10);
+    const m = await req('POST', `/sites/${sid}/materials`, {
+      token: tokenA,
+      body: {
+        name: `TMT Steel ${RUN_ID}`, category: 'Steel', quantity: 100, unit: 'Kg', rate: 60,
+        openingStock: 50, minStockLevel: 40, trackStock: true,
+      },
+    });
+    const materialId = m.data?.data?._id;
+    await expect('Material usage: create tracked material', m.status < 300 && Boolean(materialId),
+      m.data?.message || `status ${m.status}`);
+
+    if (materialId) {
+      const findRow = (payload, name, unit) =>
+        (payload?.data?.stock || []).find((r) => r.materialName === name && r.unit === unit);
+
+      // Stock before usage: opening 50 + purchased 100 = 150, not low (min 40).
+      const s1 = await req('GET', `/sites/${sid}/material-stock`, { token: tokenA });
+      const row1 = findRow(s1.data, `TMT Steel ${RUN_ID}`, 'Kg');
+      await expect('Material usage: stock projection (opening+purchased)',
+        s1.status < 300 && row1 && Number(row1.currentStock) === 150 && row1.isLowStock === false,
+        `row=${JSON.stringify(row1)}`);
+
+      // Consume 30 kg.
+      const u = await req('POST', `/sites/${sid}/material-usage`, {
+        token: tokenA,
+        body: { material: materialId, quantity: 30, date: today, workActivity: 'Slab binding' },
+      });
+      const usageId = u.data?.data?._id;
+      await expect('Material usage: create',
+        u.status < 300 && Boolean(usageId) && u.data?.data?.materialName === `TMT Steel ${RUN_ID}`,
+        u.data?.message || `status ${u.status}`);
+
+      if (usageId) {
+        const list = await req('GET', `/sites/${sid}/material-usage`, { token: tokenA });
+        await expect('Material usage: list', firstArray(list.data).length === 1,
+          `count=${firstArray(list.data).length}`);
+
+        const s2 = await req('GET', `/sites/${sid}/material-stock`, { token: tokenA });
+        const row2 = findRow(s2.data, `TMT Steel ${RUN_ID}`, 'Kg');
+        await expect('Material usage: stock drops by used qty (150-30=120)',
+          row2 && Number(row2.currentStock) === 120 && Number(row2.used) === 30,
+          `row=${JSON.stringify(row2)}`);
+
+        const upd = await req('PUT', `/sites/${sid}/material-usage/${usageId}`, {
+          token: tokenA, body: { quantity: 50 },
+        });
+        await expect('Material usage: update',
+          upd.status < 300 && Number(upd.data?.data?.quantity) === 50,
+          upd.data?.message || `status ${upd.status}`);
+
+        const s3 = await req('GET', `/sites/${sid}/material-stock`, { token: tokenA });
+        const row3 = findRow(s3.data, `TMT Steel ${RUN_ID}`, 'Kg');
+        await expect('Material usage: stock follows update (150-50=100)',
+          row3 && Number(row3.currentStock) === 100,
+          `row=${JSON.stringify(row3)}`);
+
+        const del = await req('DELETE', `/sites/${sid}/material-usage/${usageId}`, { token: tokenA });
+        await expect('Material usage: delete', del.status < 300,
+          del.data?.message || `status ${del.status}`);
+      }
+
+      // Raise min level above current stock -> low-stock flag + count.
+      await req('PUT', `/sites/${sid}/materials/${materialId}`, {
+        token: tokenA, body: { minStockLevel: 500 },
+      });
+      const s4 = await req('GET', `/sites/${sid}/material-stock`, { token: tokenA });
+      const row4 = findRow(s4.data, `TMT Steel ${RUN_ID}`, 'Kg');
+      await expect('Material usage: low-stock flag raised',
+        row4 && row4.isLowStock === true && (s4.data?.data?.lowStockCount || 0) >= 1,
+        `row=${JSON.stringify(row4)} low=${s4.data?.data?.lowStockCount}`);
+
+      await req('DELETE', `/sites/${sid}/materials/${materialId}`, { token: tokenA });
+    }
+  }
+
   // --- Worker wages tab: nested worker payment lifecycle ---
   if (createdIds.site) {
     const sid = createdIds.site;
@@ -339,6 +462,13 @@ async function main() {
       await expect('Worker payments: create (auto total)', wp.status < 300 && Boolean(wpId),
         wp.data?.message || `status ${wp.status}`);
 
+      // paidAmount is honoured at creation: 5 x 700 = 3500 owed, 3500 paid -> Paid.
+      await expect('Worker payments: create honours paidAmount (Paid)',
+        wp.status < 300 && wp.data?.data?.status === 'Paid'
+          && Number(wp.data?.data?.paidAmount) === 3500
+          && Number(wp.data?.data?.pendingAmount) === 0,
+        `status=${wp.data?.data?.status} paid=${wp.data?.data?.paidAmount} pending=${wp.data?.data?.pendingAmount}`);
+
       if (wpId) {
         const list = await req('GET', `/sites/${sid}/worker-payments`, { token: tokenA });
         await expect('Worker payments: list', firstArray(list.data).length === 1,
@@ -354,6 +484,109 @@ async function main() {
       }
 
       await req('DELETE', `/sites/${sid}/workers/${workerId}`, { token: tokenA });
+    }
+  }
+
+  // --- Attendance tab: single mark, bulk mark, summary, update, delete ---
+  if (createdIds.site) {
+    const sid = createdIds.site;
+    const w = await req('POST', `/sites/${sid}/workers`, {
+      token: tokenA,
+      body: { name: 'Attendance Worker', mobile: '9555555555', workerType: 'Mason', dailyWage: 800 },
+    });
+    const w2 = await req('POST', `/sites/${sid}/workers`, {
+      token: tokenA,
+      body: { name: 'Attendance Helper', mobile: '9666666666', workerType: 'Helper', dailyWage: 600 },
+    });
+    const workerId = w.data?.data?._id;
+    const workerId2 = w2.data?.data?._id;
+    await expect('Attendance: create workers for marking', Boolean(workerId && workerId2),
+      w.data?.message || `status ${w.status}`);
+
+    if (workerId && workerId2) {
+      const day = new Date().toISOString().slice(0, 10);
+
+      // Single mark: Present = 1x daily wage, computed server-side.
+      const one = await req('POST', `/sites/${sid}/attendance`, {
+        token: tokenA,
+        body: { worker: workerId, date: day, status: 'Present', workHours: 8, notes: 'Day 1' },
+      });
+      await expect('Attendance: single mark (Present)', one.status < 300 && Number(one.data?.data?.earnedAmount) === 800,
+        `status ${one.status} earned=${one.data?.data?.earnedAmount}`);
+
+      // Re-marking the same worker/day must upsert, never duplicate.
+      await req('POST', `/sites/${sid}/attendance`, {
+        token: tokenA,
+        body: { worker: workerId, date: day, status: 'Half Day' },
+      });
+      const afterUpsert = await req('GET', `/sites/${sid}/attendance?workerId=${workerId}`, { token: tokenA });
+      const upserted = firstArray(afterUpsert.data);
+      await expect('Attendance: re-marking same day upserts (no duplicate)', upserted.length === 1,
+        `count=${upserted.length}`);
+      await expect('Attendance: Half Day earns 0.5x wage', Number(upserted[0]?.earnedAmount) === 400,
+        `earned=${upserted[0]?.earnedAmount}`);
+
+      // Invalid status is rejected by the backend enum.
+      const bad = await req('POST', `/sites/${sid}/attendance`, {
+        token: tokenA, body: { worker: workerId, date: day, status: 'On Vacation' },
+      });
+      await expect('Attendance: invalid status rejected (400)', bad.status === 400, `status ${bad.status}`);
+
+      // Bulk mark the second worker as Absent -> earns nothing.
+      const bulk = await req('POST', `/sites/${sid}/attendance/bulk`, {
+        token: tokenA,
+        body: { date: day, entries: [{ worker: workerId2, status: 'Absent', workHours: 0 }] },
+      });
+      await expect('Attendance: bulk mark (Absent)', bulk.status < 300,
+        bulk.data?.message || `status ${bulk.status}`);
+
+      // Summary rollup for the day.
+      const sum = await req('GET', `/sites/${sid}/attendance/summary?from=${day}&to=${day}`, { token: tokenA });
+      const totals = sum.data?.data?.totals || {};
+      await expect('Attendance: summary totals', sum.status < 300 && totals.workerCount === 2
+        && Number(totals.halfDays) === 1 && Number(totals.absentDays) === 1
+        && Number(totals.totalEarned) === 400,
+        `status=${sum.status} msg=${sum.data?.message} totals=${JSON.stringify(totals)}`);
+
+      // Date filter excludes other days.
+      const filtered = await req('GET', `/sites/${sid}/attendance?from=${day}&to=${day}`, { token: tokenA });
+      await expect('Attendance: date range filter', filtered.status < 300 && firstArray(filtered.data).length === 2,
+        `count=${firstArray(filtered.data).length}`);
+
+      // Cross-tenant protection: engineer B cannot mark attendance on engineer A's site.
+      const foreign = await req('POST', `/sites/${sid}/attendance`, {
+        token: tokenB, body: { worker: workerId, date: day, status: 'Present' },
+      });
+      await expect('Attendance: cross-engineer mark blocked (404)', foreign.status === 404, `status ${foreign.status}`);
+
+      const foreignList = await req('GET', `/sites/${sid}/attendance`, { token: tokenB });
+      await expect('Attendance: cross-engineer list blocked (404)', foreignList.status === 404, `status ${foreignList.status}`);
+
+      // Update status -> earnings recalculated.
+      const recId = upserted[0]?._id;
+      if (recId) {
+        const upd = await req('PUT', `/sites/${sid}/attendance/${recId}`, {
+          token: tokenA, body: { status: 'Present' },
+        });
+        await expect('Attendance: update recalculates earnings', upd.status < 300
+          && Number(upd.data?.data?.earnedAmount) === 800,
+          `status ${upd.status} earned=${upd.data?.data?.earnedAmount}`);
+
+        const del = await req('DELETE', `/sites/${sid}/attendance/${recId}`, { token: tokenA });
+        await expect('Attendance: delete', del.status < 300, del.data?.message || `status ${del.status}`);
+      }
+
+      // Clean up remaining attendance + both workers.
+      const leftover = await req('GET', `/sites/${sid}/attendance`, { token: tokenA });
+      for (const row of firstArray(leftover.data)) {
+        await req('DELETE', `/sites/${sid}/attendance/${row._id}`, { token: tokenA });
+      }
+      const after = await req('GET', `/sites/${sid}/attendance`, { token: tokenA });
+      await expect('Attendance: register empty after cleanup', firstArray(after.data).length === 0,
+        `count=${firstArray(after.data).length}`);
+
+      await req('DELETE', `/sites/${sid}/workers/${workerId}`, { token: tokenA });
+      await req('DELETE', `/sites/${sid}/workers/${workerId2}`, { token: tokenA });
     }
   }
 
@@ -381,6 +614,13 @@ async function main() {
         const list = await req('GET', `/sites/${sid}/vendor-payments`, { token: tokenA });
         await expect('Vendor payments: list', firstArray(list.data).length === 1,
           `count=${firstArray(list.data).length}`);
+
+        // Ledger: purchases (debit) + payments (credit) with running balance.
+        const led = await req('GET', `/sites/${sid}/vendors/${vendorId}/ledger`, { token: tokenA });
+        await expect('Vendor ledger: loads with payment credit',
+          led.status < 300 && Number(led.data?.data?.summary?.totalPaid) === 25000
+            && Array.isArray(led.data?.data?.ledger),
+          `status ${led.status} paid=${led.data?.data?.summary?.totalPaid}`);
 
         const del = await req('DELETE', `/sites/${sid}/vendor-payments/${vpId}`, { token: tokenA });
         await expect('Vendor payments: delete', del.status < 300, del.data?.message || `status ${del.status}`);

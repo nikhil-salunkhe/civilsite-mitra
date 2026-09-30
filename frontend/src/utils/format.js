@@ -81,3 +81,27 @@ export const formatFileSize = (bytes) => {
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const buildExportUrl = (path) => `${API_BASE_URL}${path}`;
+
+/**
+ * Absolute URL for a server-relative media path such as `/uploads/x.png`.
+ *
+ * Uploaded files are served from `/uploads` on the API host, which is NOT under
+ * `/api`. Using the stored value directly as an <img src> therefore resolves it
+ * against the frontend origin and breaks in both dev and production.
+ *
+ *   dev  -> API_BASE_URL is '/api', so the Vite proxy serves /uploads and we
+ *           return the path unchanged.
+ *   prod -> API_BASE_URL is 'https://api.host/api', so we swap the /api suffix
+ *           for the origin and return an absolute URL.
+ *
+ * Absolute URLs, data: and blob: sources are passed through untouched.
+ */
+export const resolveMediaUrl = (value) => {
+  if (!value || typeof value !== 'string') return '';
+  if (/^(https?:)?\/\//i.test(value)) return value;
+  if (/^(data|blob):/i.test(value)) return value;
+  const origin = API_BASE_URL.startsWith('http')
+    ? API_BASE_URL.replace(/\/api\/?$/, '')
+    : '';
+  return `${origin}${value.startsWith('/') ? '' : '/'}${value}`;
+};

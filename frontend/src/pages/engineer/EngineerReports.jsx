@@ -19,18 +19,27 @@ export const EngineerReports = () => {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({});
   const [busy, setBusy] = useState('');
+  // A failed portfolio call used to render five silent zeros, which looks like
+  // "you earned nothing" instead of "we could not load it".
+  const [summaryError, setSummaryError] = useState('');
 
-  useEffect(() => {
+  const loadSummary = React.useCallback(() => {
+    setSummaryError('');
     api.get('/sites/summary')
       .then(({ data: r }) => setSummary(r.data?.financials || null))
-      .catch(() => { /* cards fall back to zeros */ });
+      .catch((err) => {
+        setSummary(null);
+        setSummaryError(err.response?.data?.message || 'Could not load the portfolio summary.');
+      });
   }, []);
+
+  useEffect(() => { loadSummary(); }, [loadSummary]);
 
   useEffect(() => {
     setLoading(true);
     api.get('/sites', { params: { page, limit: 10, search: search || undefined, status: status || undefined } })
-      .then(({ data: r }) => { setSites(r.data.data.sites || []); setPagination(r.data.data.pagination); })
-      .catch(() => toast.error('Failed to load sites'))
+      .then(({ data: r }) => { setSites(r.data.sites || []); setPagination(r.data.pagination); })
+      .catch((err) => toast.error(err.response?.data?.message || 'Failed to load sites'))
       .finally(() => setLoading(false));
   }, [page, search, status]);
 
@@ -74,6 +83,13 @@ export const EngineerReports = () => {
           </div>
         ))}
       </div>
+
+      {summaryError && (
+        <div className="card border-l-4 border-l-warning-500 flex flex-wrap items-center justify-between gap-3 !py-3">
+          <p className="text-sm text-gray-600">Portfolio totals unavailable — {summaryError}</p>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadSummary}>Retry</button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <SearchInput value={search} onChange={(v) => { setPage(1); setSearch(v); }} placeholder="Search sites..." className="flex-1" />
@@ -119,21 +135,21 @@ export const EngineerReports = () => {
                     <td><StatusBadge status={site.status} /></td>
                     <td className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        <button type="button" 
                           className="btn btn-secondary btn-sm"
                           disabled={busy === `${site._id}-pdf`}
                           onClick={() => exportFile(site, 'pdf')}
                         >
                           {busy === `${site._id}-pdf` ? '...' : 'PDF'}
                         </button>
-                        <button
+                        <button type="button" 
                           className="btn btn-secondary btn-sm"
                           disabled={busy === `${site._id}-excel`}
                           onClick={() => exportFile(site, 'excel')}
                         >
                           {busy === `${site._id}-excel` ? '...' : 'Excel'}
                         </button>
-                        <button
+                        <button type="button" 
                           className="btn btn-secondary btn-sm"
                           disabled={busy === `${site._id}-csv`}
                           onClick={() => exportFile(site, 'csv')}

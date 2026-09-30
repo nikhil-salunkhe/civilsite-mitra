@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { PageHeader, FormSection, FormRow, FormGroup } from '../components/UI';
+import { resolveMediaUrl } from '../utils/format';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
@@ -46,7 +47,10 @@ export const ProfilePage = () => {
     [photoPreview]
   );
 
-  const currentPhoto = user?.profilePhoto || '';
+  const currentPhoto = resolveMediaUrl(user?.profilePhoto);
+  // A stale/removed file should fall back to initials rather than a broken icon.
+  const [photoBroken, setPhotoBroken] = useState(false);
+  const savedPhoto = photoBroken ? '' : currentPhoto;
 
   const handlePhotoChange = (event) => {
     const file = event.target.files?.[0];
@@ -129,10 +133,11 @@ export const ProfilePage = () => {
       <form onSubmit={handleSubmit} className="card space-y-6">
         <FormSection title="Profile Photo">
           <div className="flex items-center gap-4">
-            {photoPreview || currentPhoto ? (
+            {photoPreview || savedPhoto ? (
               <img
-                src={photoPreview || currentPhoto}
+                src={photoPreview || savedPhoto}
                 alt="Profile"
+                onError={() => setPhotoBroken(true)}
                 className="w-20 h-20 rounded-full object-cover border border-gray-200"
               />
             ) : (
