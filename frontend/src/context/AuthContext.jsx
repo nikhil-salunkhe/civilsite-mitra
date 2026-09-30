@@ -2,8 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { API_BASE_URL } from '../utils/format';
 
-const API_BASE = '/api';
+// Single source of truth. This used to be a hardcoded '/api', which silently
+// ignored VITE_API_URL and sent every call to the frontend's own origin - so a
+// deployed build could never reach the backend. Resolve it from the shared
+// config instead: '/api' in dev (Vite proxies to :5000), the real API origin in
+// production.
+const API_BASE = API_BASE_URL;
 
 // Endpoints that legitimately work without a session (sign-in, password
 // recovery). Every other call is an authenticated call.
