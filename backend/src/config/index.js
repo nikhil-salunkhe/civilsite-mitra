@@ -1,13 +1,54 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PROD = NODE_ENV === 'production';
+
+/**
+ * Read a required environment variable.
+ *
+ * In production a missing variable is a fatal configuration error - we fail fast
+ * with a clear message instead of silently falling back to a localhost default
+ * that will never work in a container (and previously caused
+ * "ECONNREFUSED 127.0.0.1:27017" on Render).
+ *
+ * In development the fallback is kept so `npm run dev` works with no setup.
+ */
+const required = (name, devFallback) => {
+  const value = process.env[name];
+  if (value && value.trim()) return value.trim();
+  if (IS_PROD) {
+    throw new Error(
+      `[config] Missing required environment variable "${name}". `
+      + `Set it in your host's environment (e.g. Render dashboard > Environment). `
+      + 'The application will not start with a development fallback in production.'
+    );
+  }
+  return devFallback;
+};
+
+const optionalUrl = (name, devFallback) => {
+  const value = process.env[name];
+  if (value && value.trim()) return value.trim();
+  // In production CLIENT_URL/SERVER_URL are optional only if we are served from
+  // the same origin; they are still expected, so warn loudly rather than fail
+  // (a single-origin deployment legitimately sets neither).
+  if (IS_PROD) {
+    console.warn(`[config] "${name}" is not set. Assuming same-origin deployment.`);
+    return null;
+  }
+  return devFallback;
+};
+
 module.exports = {
   port: process.env.PORT || 5000,
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv: NODE_ENV,
+  isProduction: IS_PROD,
 
-  mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/civilsite-mitra',
+  // Required in production. No localhost fallback can survive a container deploy.
+  mongoUri: required('MONGO_URI', 'mongodb://localhost:27017/civilsite-mitra'),
 
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
+    secret: required('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production'),
     expire: process.env.JWT_EXPIRE || '7d',
     refreshExpire: process.env.JWT_REFRESH_EXPIRE || '30d',
   },
@@ -17,8 +58,16 @@ module.exports = {
     password: process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456',
   },
 
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  serverUrl: process.env.SERVER_URL || 'http://localhost:5000',
+  clientUrl: optionalUrl('CLIENT_URL', 'http://localhost:5173'),
+  serverUrl: optionalUrl('SERVER_URL', 'http://localhost:5000'),
+  // CORS accepts a list; a single deployment may legitimately have no CLIENT_URL.
+  corsOrigins: (() => {
+    const list = (process.env.CORS_ORIGINS || process.env.CLIENT_URL || '')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+    return list.length ? list : IS_PROD ? false : ['http://localhost:5173'];
+  })(),
 
   // Throttling. A construction site office typically shares a single public IP
   // (or sits behind a NAT), so the general API budget must comfortably cover a

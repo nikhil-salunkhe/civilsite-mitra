@@ -58,8 +58,11 @@ app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 
 // CORS
+// config.corsOrigins is derived from CLIENT_URL / CORS_ORIGINS in config/index.js.
+// In production an unset CLIENT_URL yields `false`, which makes the cors package
+// refuse cross-origin requests instead of falling back to http://localhost:5173.
 app.use(cors({
-  origin: config.clientUrl,
+  origin: config.corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

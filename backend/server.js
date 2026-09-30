@@ -6,14 +6,18 @@ const config = require('./src/config');
 // Connect to MongoDB
 connectDB();
 
-// Start server
-const PORT = config.port || 5000;
+// Start server.
+// PORT is supplied by the host (Render sets it automatically). It is never
+// hardcoded to a fixed number - the fallback is only for local development.
+const PORT = process.env.PORT || config.port || 5000;
 
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 CivilSiteMitra Server running on port ${PORT}`);
   console.log(`📊 Environment: ${config.nodeEnv}`);
   console.log(`📁 Upload path: ${config.upload.path}`);
-  console.log(`🔗 Client URL: ${config.clientUrl}\n`);
+  // clientUrl may be null in production when CLIENT_URL is intentionally unset
+  // (same-origin deployment), so never print an empty line as if it were a URL.
+  console.log(`🔗 Client URL: ${config.clientUrl || '(same-origin / not configured)'}\n`);
 });
 
 // Handle server errors
