@@ -45,7 +45,9 @@ export const AdminLayout = () => {
             </button>
           </div>
 
-          <nav className="flex-1 px-4 py-6">
+          {/* overflow-y-auto lets a long nav scroll instead of pushing the
+              profile + Sign Out block below the fold, where it is invisible. */}
+          <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
             <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
             <ul className="space-y-1">
               {navItems.map((item) => {
@@ -68,7 +70,7 @@ export const AdminLayout = () => {
             </ul>
           </nav>
 
-          <div className="px-4 py-4 border-t border-gray-200">
+          <div className="shrink-0 px-4 py-4 border-t border-gray-200">
             <div className="flex items-center gap-3">
               <Avatar user={user} size="sm" />
               <div className="flex-1 min-w-0">

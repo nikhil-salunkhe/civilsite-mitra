@@ -240,18 +240,22 @@ export function SiteDashboard() {
         </div>
       </div>
 
-      {/* Tab rail: sticky vertical column with icons on desktop, horizontally
-          scrollable strip on mobile. Active tab mirrors into ?tab= for links. */}
+      {/* Tab rail is a vertical list at every width. The WRAPPER decides whether
+          it sits beside the content (lg+) or above it (mobile/tablet):
+          flex-col on small screens, flex-row from lg up. The tablist itself is
+          always flex-col, so the sections are never a horizontal strip.
+          On mobile the rail is height-capped and scrolls internally so the panel
+          below stays visible. Active tab mirrors into ?tab= for deep links. */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <nav
           className="card !py-2 w-full lg:w-56 lg:shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
           aria-label="Site sections"
         >
-          <p className="hidden lg:block px-3 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+          <p className="block px-3 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
             Site Sections
           </p>
           <div
-            className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0"
+            className="flex flex-col gap-1 max-h-[45vh] overflow-y-auto pb-1 lg:max-h-none lg:overflow-visible lg:pb-0"
             role="tablist"
           >
             {TAB_NAMES.map((t) => {
