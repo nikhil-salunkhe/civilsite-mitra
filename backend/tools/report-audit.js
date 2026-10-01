@@ -112,12 +112,15 @@ const run = async () => {
     ['phone', '9764149564'],
     ['email', 'techmitroofficial@gmail.com'],
     ['website', 'techmitr.in'],
-    ['page numbers', 'Page ${'],
   ];
   for (const [label, needle] of wanted) {
     if (src.includes(needle)) ok(`PDF ${label}`, 'rendered by siteReport.js');
     else bad(`PDF ${label}`, 'not present in the renderer');
   }
+
+  // Page numbers were removed by request, so the renderer must NOT emit them.
+  if (/Page \$\{/.test(src)) bad('PDF page numbers', 'renderer still emits "Page X of Y"');
+  else ok('PDF page numbers', 'removed as requested');
 
   const failed = rows.filter((r) => !r[0]).length;
   console.log(`\nREPORT_AUDIT checks=${rows.length} failed=${failed}`);

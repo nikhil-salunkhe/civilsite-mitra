@@ -20,8 +20,8 @@ const { buildReportMeta } = require('../services/reportService');
  *  4. Empty sections are skipped entirely: no heading, no table header, and no
  *     "No records available" filler.
  *  5. Table headers repeat on every continuation page and can never be orphaned.
- *  6. The running header/footer (page numbers) are painted over the buffered
- *     pages at the very end, so they can never shift the flow.
+ *  6. The running header/footer (letterhead, vendor contact, generated date)
+ *     are painted over the buffered pages at the very end, so they can never shift the flow.
  */
 
 const PAGE_W = 595.28;
@@ -1062,12 +1062,8 @@ const buildSiteReportPdf = (data) => {
     doc.font(F.normal).fontSize(6.6).fillColor(COLORS.muted)
       .text(
         `CivilSiteMitra  |  Construction Project Management  |  Generated ${generatedOn}`,
-        MARGIN, PAGE_H - 22, { width: CONTENT_W * 0.68, height: 9, ellipsis: true, lineBreak: false }
+        MARGIN, PAGE_H - 22, { width: CONTENT_W, height: 9, ellipsis: true, lineBreak: false }
       );
-    doc.font(F.bold).fontSize(6.6).fillColor(COLORS.navy)
-      .text(`Page ${i - range.start + 1} of ${totalPages}`, MARGIN, PAGE_H - 22, {
-        width: CONTENT_W * 0.32, height: 9, align: 'right', lineBreak: false,
-      });
   }
 
   doc.end();

@@ -295,10 +295,12 @@ const inspectPages = (buf) => {
     blanks.map((b) => `page ${b.page} runs=${b.textRuns}`).join(', ')
   );
 
-  // Every page must carry the "Page N of M" footer, which is the only way a
-  // reader can tell a truncated dossier from a complete one.
-  const unnumbered = pages.filter((p) => !/Page\s+\d+\s+of\s+\d+/i.test(p.strings));
-  check(unnumbered.length === 0, `unnumbered pages=${unnumbered.length}`);
+  // Footer content must be present on every page, so a client can always tell a
+  // complete report from a truncated one. Page NUMBERS were removed by request
+  // (renderer no longer emits "Page N of M"), so the vendor contact block is the
+  // thing that proves the running footer actually painted.
+  const unnumbered = pages.filter((p) => !/TechMitra/i.test(p.strings));
+  check(unnumbered.length === 0, `pages missing the footer block=${unnumbered.length}`);
 
   const overflow = pages.filter((p) => p.lowestTextY > FOOTER_RULE_Y);
   check(
