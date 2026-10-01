@@ -59,6 +59,38 @@ const MaterialsTab = makeCrudTab({
     invoiceNumber: f.invoiceNumber || '',
     notes: f.notes || '',
   }),
+
+  // Live read-out while the engineer types. The engineer never types a total:
+  // it is always quantity x rate, and the server recomputes it on save.
+  formExtra: (f) => {
+    const qty = Number(f.quantity);
+    const rate = Number(f.rate);
+    const hasBoth = Number.isFinite(qty) && Number.isFinite(rate) && f.quantity !== '' && f.rate !== '';
+    const total = hasBoth ? qty * rate : 0;
+    const paid = Number(f.paidAmount) || 0;
+    const pending = Math.max(0, total - paid);
+    return (
+      <div className="rounded-lg border border-primary-200 bg-primary-50 p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-primary-700">Total (auto-calculated)</span>
+          <span className="text-base font-bold text-primary-900">{money(total)}</span>
+        </div>
+        <p className="text-[11px] text-primary-600 mt-1">
+          {hasBoth
+            ? `${qty} ${f.unit || ''} × ${money(rate)} = ${money(total)}`
+            : 'Enter quantity and rate to see the total.'}
+        </p>
+        {hasBoth && paid > 0 && (
+          <p className="text-[11px] text-primary-700 mt-1">
+            Paid {money(paid)} · Pending {money(pending)}
+          </p>
+        )}
+        <p className="text-[10px] text-primary-500 mt-1.5">
+          Total is calculated for you — it cannot be typed or overridden.
+        </p>
+      </div>
+    );
+  },
 });
 
 export default MaterialsTab;

@@ -41,12 +41,16 @@ const createMaterial = asyncHandler(async (req, res) => {
     openingStock, minStockLevel, trackStock,
   } = req.body;
 
-  if (!name || !category || !quantity || !unit || !rate) {
-    throw new ApiError('Name, category, quantity, unit, and rate are required', 400);
+  // Explicitly test for "not supplied" rather than relying on falsiness, so a
+  // legitimate 0 rate (allowed by the check below) is not rejected as missing.
+  const missing = ['name', 'category', 'quantity', 'unit', 'rate']
+    .filter((k) => req.body[k] === undefined || req.body[k] === null || req.body[k] === '');
+  if (missing.length) {
+    throw new ApiError(`Required: ${missing.join(', ')}`, 400);
   }
 
   if (quantity <= 0 || rate < 0) {
-    throw new ApiError('Quantity and rate must be positive', 400);
+    throw new ApiError('Quantity must be greater than zero and rate cannot be negative', 400);
   }
 
   const material = new Material({

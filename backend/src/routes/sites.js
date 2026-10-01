@@ -160,6 +160,21 @@ router.get('/:siteId/reports', reportController.getReports);
 router.get('/:siteId/report/pdf', reportController.getSitePdfReport);
 router.get('/:siteId/export/excel', reportController.exportExcel);
 router.get('/:siteId/export/csv', reportController.exportCsv);
+// Per-material PDF (complete history of one material) - declared after the
+// generic /reports route so it can never be shadowed by it.
+router.get(
+  '/:siteId/reports/material/:materialId/pdf',
+  reportController.getMaterialPdfReport,
+);
+// Weekly / monthly / custom material purchase + usage report.
+router.get(
+  '/:siteId/reports/material-period',
+  reportController.getMaterialPeriodPdfReport,
+);
+router.get(
+  '/:siteId/reports/material-period/preview',
+  reportController.getMaterialPeriodPreview,
+);
 
 module.exports = router;
 

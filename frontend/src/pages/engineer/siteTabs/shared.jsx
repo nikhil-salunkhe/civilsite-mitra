@@ -130,7 +130,7 @@ export const LoadingRow = ({ colSpan }) => (
 //   toForm   : optional (row) => form values for the modal
 //   fromForm : optional (form) => request body (e.g. string -> number)
 // ---------------------------------------------------------------------------
-export const makeCrudTab = ({ basePath, title, columns, fields, toForm, fromForm }) => {
+export const makeCrudTab = ({ basePath, title, columns, fields, toForm, fromForm, formExtra }) => {
   const singular = title.replace(/s$/, '');
   const Tab = ({ siteId, onChanged }) => {
     const { items, loading, reload } = useList(siteId, basePath);
@@ -226,6 +226,10 @@ export const makeCrudTab = ({ basePath, title, columns, fields, toForm, fromForm
                 onChange={set(f.key)}
               />
             ))}
+            {/* Optional live read-out (e.g. a derived total) for tabs whose
+                fields imply a calculation. Purely presentational: the value is
+                still recomputed server-side on save. */}
+            {formExtra && formExtra(form)}
           </Modal>
         )}
       </div>

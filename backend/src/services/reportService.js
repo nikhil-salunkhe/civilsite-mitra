@@ -1,4 +1,4 @@
-const Site = require('../models/Site');
+﻿const Site = require('../models/Site');
 const { SITE_REPORT_SECTIONS } = require('../reports/reportSchema');
 const Installment = require('../models/Installment');
 const Payment = require('../models/Payment');
@@ -300,4 +300,238 @@ const assembleEngineerReportData = async (engineerId, engineer) => {
   };
 };
 
-module.exports = { assembleSiteReportData, assembleEngineerReportData, buildReportMeta };
+
+/**
+ * ---------------------------------------------------------------------------
+ * MATERIAL REPORT DATA (the ONE place material rollups are computed)
+ * ---------------------------------------------------------------------------
+ * Both the per-material PDF and the weekly/monthly material PDF read from these
+ * helpers, so a number can never differ between them, the material list, the
+ * dashboard or the site dossier.
+ *
+ * BALANCE SAFETY: purchased and consumed quantities are only ever subtracted
+ * inside a (name + unit) bucket, so "100 Bags - 20 Kg" is structurally
+ * impossible. A bucket with nothing to subtract from reports no balance at all
+ * rather than a misleading number.
+ */
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const keyOf = (name, unit) =>
+  `${String(name || '').trim().toLowerCase()}__${String(unit || '').trim().toLowerCase()}`;
+
+/** Rolls purchases + usage into one row per (material name, unit). */
+const rollupMaterials = (purchases, usages) => {
+  const buckets = new Map();
+
+  for (const p of purchases || []) {
+    const key = keyOf(p.name, p.unit);
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key, name: p.name || '-', unit: p.unit || '', category: p.category || '',
+        purchased: 0, used: 0, amount: 0, paid: 0, purchases: 0,
+      });
+    }
+    const b = buckets.get(key);
+    b.purchased = round2(b.purchased + (Number(p.quantity) || 0));
+    b.amount = round2(b.amount + (Number(p.totalAmount) || 0));
+    b.paid = round2(b.paid + (Number(p.paidAmount) || 0));
+    b.purchases += 1;
+  }
+
+  for (const u of usages || []) {
+    const name = u.materialName || (u.material && u.material.name);
+    const key = keyOf(name, u.unit);
+    if (!buckets.has(key)) {
+      // Usage with no matching purchase: keep it visible instead of hiding it.
+      buckets.set(key, {
+        key, name: name || '-', unit: u.unit || '', category: '',
+        purchased: 0, used: 0, amount: 0, paid: 0, purchases: 0,
+      });
+    }
+    buckets.get(key).used = round2(buckets.get(key).used + (Number(u.quantity) || 0));
+  }
+
+  return [...buckets.values()].map((b) => ({
+    ...b,
+    pending: round2(b.amount - b.paid),
+    // Units match by construction inside the bucket, so this is always safe.
+    balance: b.purchased > 0 ? round2(b.purchased - b.used) : null,
+    balanceAvailable: b.purchased > 0,
+  })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+};
+
+/** Vendor -> material rows, for the vendor purchase summary. */
+const rollupVendors = (purchases) => {
+  const vendors = new Map();
+  for (const p of purchases || []) {
+    const name = (p.vendor && p.vendor.name) || p.vendorName || 'Unassigned';
+    if (!vendors.has(name)) vendors.set(name, { vendor: name, rows: [], quantity: 0, amount: 0 });
+    const v = vendors.get(name);
+    v.quantity = round2(v.quantity + (Number(p.quantity) || 0));
+    v.amount = round2(v.amount + (Number(p.totalAmount) || 0));
+    v.rows.push({
+      material: p.name || '-',
+      unit: p.unit || '',
+      quantity: Number(p.quantity) || 0,
+      rate: Number(p.rate) || 0,
+      amount: Number(p.totalAmount) || 0,
+    });
+  }
+  return [...vendors.values()].sort((a, b) => b.amount - a.amount);
+};
+
+/**
+ * Full history for ONE material (every purchase of that name+unit, every
+ * vendor) - powers the "separate PDF for each material" report.
+ * @throws 404 when the material does not belong to the given site.
+ */
+const assembleMaterialReportData = async (site, materialId) => {
+  const Material = require('../models/Material');
+  const MaterialUsage = require('../models/MaterialUsage');
+  const siteId = site._id;
+
+  const anchor = await Material.findOne({ _id: materialId, site: siteId }).lean();
+  if (!anchor) {
+    // Explicit 404 - ApiError defaults to 500 when the status is omitted.
+    const { ApiError } = require('../middleware/errorHandler');
+    throw new ApiError('Material not found for this site', 404);
+  }
+
+  // Escape the name so a material literally called "Cement ( OPC )" still
+  // matches, and anchor the pattern so "Cement" does not pull in "Cement Sand".
+  const escaped = String(anchor.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const purchases = await Material.find({
+    site: siteId,
+    name: { $regex: `^${escaped}$`, $options: 'i' },
+  }).populate('vendor', 'name').sort({ purchaseDate: 1 }).lean();
+
+  const usages = await MaterialUsage.find({
+    site: siteId, materialName: anchor.name, unit: anchor.unit,
+  }).sort({ date: 1 }).lean();
+
+  const rollup = rollupMaterials(purchases, usages);
+  return {
+    site,
+    material: {
+      name: anchor.name,
+      category: anchor.category || '-',
+      unit: anchor.unit || '',
+      openingStock: Number(anchor.openingStock) || 0,
+      minimumStock: Number(anchor.minStockLevel) || 0,
+    },
+    purchases,
+    usages,
+    rollup,
+    vendors: rollupVendors(purchases),
+    totals: materialTotals(rollup, purchases, usages),
+    period: { from: null, to: null, label: 'Complete history', type: 'all' },
+    generatedAt: new Date(),
+  };
+};
+
+/**
+ * Purchases + usage + balance + vendor summary for a site over a period.
+ * The rollup is derived from exactly the filtered rows, so the totals can never
+ * disagree with the detail tables printed beneath them.
+ */
+const assembleMaterialPeriodData = async (site, filters = {}) => {
+  const Material = require('../models/Material');
+  const MaterialUsage = require('../models/MaterialUsage');
+  const siteId = site._id;
+  const range = periodFilter(filters);
+
+  const [allPurchases, allUsages] = await Promise.all([
+    Material.find({ site: siteId }).populate('vendor', 'name').lean(),
+    MaterialUsage.find({ site: siteId }).lean(),
+  ]);
+
+  const inRange = (value, r) => {
+    if (!r) return true;
+    if (!value) return false;
+    const t = new Date(value).getTime();
+    return (!r.$gte || t >= r.$gte.getTime()) && (!r.$lte || t <= r.$lte.getTime());
+  };
+
+  const nameFilter = filters.material ? String(filters.material).trim().toLowerCase() : null;
+  const vendorFilter = filters.vendor ? String(filters.vendor).trim().toLowerCase() : null;
+
+  const purchases = allPurchases.filter((p) => inRange(p.purchaseDate, range))
+    .filter((p) => !nameFilter || String(p.name || '').toLowerCase().includes(nameFilter))
+    .filter((p) => !vendorFilter
+      || String((p.vendor && p.vendor.name) || p.vendorName || '').toLowerCase().includes(vendorFilter))
+    .sort((a, b) => new Date(a.purchaseDate || 0) - new Date(b.purchaseDate || 0));
+
+  const usages = allUsages.filter((u) => inRange(u.date, range))
+    .filter((u) => !nameFilter || String(u.materialName || '').toLowerCase().includes(nameFilter))
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+
+  const rollup = rollupMaterials(purchases, usages);
+  return {
+    site,
+    materialFilter: filters.material || null,
+    vendorFilter: filters.vendor || null,
+    period: {
+      from: filters.from || null,
+      to: filters.to || null,
+      label: filters.label || 'Entire project',
+      type: filters.type || 'custom',
+    },
+    purchases,
+    usages,
+    rollup,
+    vendors: rollupVendors(purchases),
+    totals: materialTotals(rollup, purchases, usages),
+    generatedAt: new Date(),
+  };
+};
+
+module.exports.assembleMaterialReportData = assembleMaterialReportData;
+module.exports.assembleMaterialPeriodData = assembleMaterialPeriodData;
+
+/** Totals block shared by both material PDFs. */
+const materialTotals = (rollup, purchases, usages) => {
+  const balanceable = rollup.filter((r) => r.balanceAvailable);
+  return {
+    materialCount: rollup.length,
+    purchaseRecords: (purchases || []).length,
+    usageRecords: (usages || []).length,
+    totalQuantityPurchased: round2(rollup.reduce((a, r) => a + r.purchased, 0)),
+    totalQuantityUsed: round2(rollup.reduce((a, r) => a + r.used, 0)),
+    totalPurchaseAmount: round2(rollup.reduce((a, r) => a + r.amount, 0)),
+    totalPaid: round2(rollup.reduce((a, r) => a + r.paid, 0)),
+    totalPending: round2(rollup.reduce((a, r) => a + r.pending, 0)),
+    balanceAvailable: balanceable.length > 0,
+    // Summed only across materials that have a purchase to subtract from.
+    totalBalance: balanceable.length
+      ? round2(balanceable.reduce((a, r) => a + r.balance, 0))
+      : null,
+  };
+};
+
+/** Builds a {from,to} range, or null for "all time". */
+const periodFilter = (filters = {}) => {
+  const { from, to } = filters;
+  if (!from && !to) return null;
+  const q = {};
+  if (from) q.$gte = new Date(from);
+  if (to) {
+    const end = new Date(to);
+    if (String(to).length <= 10) end.setHours(23, 59, 59, 999);
+    q.$lte = end;
+  }
+  return q;
+};
+
+
+module.exports = {
+  assembleSiteReportData, assembleEngineerReportData, buildReportMeta,
+  rollupMaterials, rollupVendors, materialTotals, periodFilter,
+  assembleMaterialReportData, assembleMaterialPeriodData,
+};
+module.exports = {
+  assembleSiteReportData, assembleEngineerReportData, buildReportMeta,
+  rollupMaterials, rollupVendors, materialTotals, periodFilter,
+};
+
+
+module.exports.assembleMaterialReportData = assembleMaterialReportData;
+module.exports.assembleMaterialPeriodData = assembleMaterialPeriodData;
