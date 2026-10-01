@@ -9,7 +9,7 @@ const {
 } = require('../services/reportService');
 const { buildSiteReportPdf } = require('../reports/siteReport');
 const { buildSiteWorkbook } = require('../exports/excelExport');
-const { safeFileSlug, toIsoDate } = require('../utils/format');
+const { safeFileSlug, toIsoDate, buildReportFilename } = require('../utils/format');
 
 /**
  * ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ const getReports = asyncHandler(async (req, res) => {
 const getSitePdfReport = asyncHandler(async (req, res) => {
   const { site, data } = await loadReportData(req);
 
-  const filename = `Site-Report-${safeFileSlug(site.siteName)}-${toIsoDate(new Date())}.pdf`;
+  const filename = buildReportFilename('Site Report', site.siteName, 'pdf');
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -150,7 +150,7 @@ const exportExcel = asyncHandler(async (req, res) => {
 
   const workbook = await buildSiteWorkbook(data, data.engineer);
 
-  const filename = `CivilSiteMitra-${safeFileSlug(site.siteName)}-${toIsoDate(new Date())}.xlsx`;
+  const filename = buildReportFilename('Financial Report', site.siteName, 'xlsx');
 
   res.setHeader(
     'Content-Type',
@@ -226,20 +226,22 @@ const CSV_BUILDERS = {
     return [
       csvSection(
         'Investment & Profit',
-        ['Head', 'Amount'],
+        // Units are stated in the header so the column is self-describing when
+        // this CSV is opened cold in Excel or Google Sheets.
+        ['Head', 'Amount (INR)'],
         [
-          ['Project Value', num(s.projectValue)],
-          ['Total Received', num(s.totalReceived)],
-          ['Pending Receivable', num(s.pendingReceivable)],
-          ['Material Cost', num(s.materialCost)],
-          ['Worker Cost', num(s.workerCost)],
-          ['Vendor Cost', num(s.vendorCost)],
-          ['Other Expenses', num(s.otherExpenses)],
-          ['Total Investment (Committed)', num(s.totalInvestment)],
-          ['Investment Paid', num(s.totalPaid)],
-          ['Outstanding Payable', num(s.outstandingPayable)],
-          ['Estimated Profit', num(s.estimatedProfit)],
-          ['Profit Margin %', num(s.profitMargin)],
+          ['Project Value (INR)', num(s.projectValue)],
+          ['Total Received (INR)', num(s.totalReceived)],
+          ['Pending Receivable (INR)', num(s.pendingReceivable)],
+          ['Material Cost (INR)', num(s.materialCost)],
+          ['Worker Cost (INR)', num(s.workerCost)],
+          ['Vendor Cost (INR)', num(s.vendorCost)],
+          ['Other Expenses (INR)', num(s.otherExpenses)],
+          ['Total Investment Committed (INR)', num(s.totalInvestment)],
+          ['Investment Paid (INR)', num(s.totalPaid)],
+          ['Outstanding Payable (INR)', num(s.outstandingPayable)],
+          ['Estimated Profit (INR)', num(s.estimatedProfit)],
+          ['Profit Margin (%)', num(s.profitMargin)],
         ]
       ),
     ];
@@ -387,8 +389,12 @@ const exportCsv = asyncHandler(async (req, res) => {
   // The BOM makes Excel open the file as UTF-8 (needed for the rupee symbol).
   const csv = `\uFEFF${header}${blocks.join('\r\n\r\n')}\r\n`;
 
-  const suffix = requested.includes('complete') ? 'Complete-Report' : types.join('-');
-  const filename = `CivilSiteMitra-${safeFileSlug(site.siteName)}-${safeFileSlug(suffix)}-${toIsoDate(new Date())}.csv`;
+  // A single-dataset export is named after that dataset; the full bundle is the
+  // "Site Data" report. Both follow CivilSiteMitra_<Kind>_<Site>_<Date>.csv.
+  const kind = requested.includes('complete') || types.length > 1
+    ? 'Site Data'
+    : `${types[0]} Data`;
+  const filename = buildReportFilename(kind, site.siteName, 'csv');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

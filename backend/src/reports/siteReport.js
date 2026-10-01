@@ -47,6 +47,18 @@ const COLORS = {
 
 const F = { bold: 'Helvetica-Bold', normal: 'Helvetica', italic: 'Helvetica-Oblique' };
 
+/**
+ * Vendor identity printed in the footer of every generated report, so a client
+ * who receives the PDF knows who produced it and how to reach them.
+ * Override with the VENDOR_* environment variables if the details change.
+ */
+const COMPANY = {
+  name: process.env.VENDOR_NAME || 'TechMitra Technology',
+  phone: process.env.VENDOR_PHONE || '9764149564',
+  email: process.env.VENDOR_EMAIL || 'techmitroofficial@gmail.com',
+  website: process.env.VENDOR_WEBSITE || 'www.techmitr.in',
+};
+
 // Helvetica (WinAnsi) has no rupee glyph, hence "Rs." - see utils/format notes.
 const money = (value) => `Rs. ${formatIndianNumber(value)}`;
 const plain = (value, suffix = '') => `${formatIndianNumber(value)}${suffix}`;
@@ -1032,15 +1044,28 @@ const buildSiteReportPdf = (data) => {
     }
 
     // Footer band, drawn at a fixed y so the column flow cannot collide with it.
-    doc.moveTo(MARGIN, PAGE_H - 42).lineTo(MARGIN + CONTENT_W, PAGE_H - 42)
+    doc.moveTo(MARGIN, PAGE_H - 44).lineTo(MARGIN + CONTENT_W, PAGE_H - 44)
       .lineWidth(0.6).strokeColor(COLORS.line).stroke();
+
+    // Company contact block - every report carries it so a client who receives
+    // the PDF knows who produced it and how to reach the vendor.
+    doc.font(F.bold).fontSize(6.6).fillColor(COLORS.navy)
+      .text(COMPANY.name, MARGIN, PAGE_H - 39, {
+        width: CONTENT_W * 0.68, height: 9, lineBreak: false,
+      });
+    doc.font(F.normal).fontSize(6.4).fillColor(COLORS.muted)
+      .text(
+        `Phone: ${COMPANY.phone}   |   Email: ${COMPANY.email}   |   Web: ${COMPANY.website}`,
+        MARGIN, PAGE_H - 31, { width: CONTENT_W * 0.68, height: 9, lineBreak: false }
+      );
+
     doc.font(F.normal).fontSize(6.6).fillColor(COLORS.muted)
       .text(
         `CivilSiteMitra  |  Construction Project Management  |  Generated ${generatedOn}`,
-        MARGIN, PAGE_H - 37, { width: CONTENT_W * 0.68, height: 9, ellipsis: true, lineBreak: false }
+        MARGIN, PAGE_H - 22, { width: CONTENT_W * 0.68, height: 9, ellipsis: true, lineBreak: false }
       );
     doc.font(F.bold).fontSize(6.6).fillColor(COLORS.navy)
-      .text(`Page ${i - range.start + 1} of ${totalPages}`, MARGIN, PAGE_H - 37, {
+      .text(`Page ${i - range.start + 1} of ${totalPages}`, MARGIN, PAGE_H - 22, {
         width: CONTENT_W * 0.32, height: 9, align: 'right', lineBreak: false,
       });
   }
