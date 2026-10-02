@@ -10,6 +10,7 @@ import VendorsTab from './VendorsTab';
 import ExpensesTab from './ExpensesTab';
 import ActivitiesTab from './ActivitiesTab';
 import ReportsTab from './ReportsTab';
+import SitePhotosTab from './SitePhotosTab';
 import DocumentsTab from './DocumentsTab';
 
 const TABS = {
@@ -24,6 +25,7 @@ const TABS = {
   Expenses: ExpensesTab,
   Activities: ActivitiesTab,
   Reports: ReportsTab,
+  'Site Photos': SitePhotosTab,
   Documents: DocumentsTab,
 };
 

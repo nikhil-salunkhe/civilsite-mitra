@@ -315,6 +315,41 @@ const assembleEngineerReportData = async (engineerId, engineer) => {
  * rather than a misleading number.
  */
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/** Parses "YYYY-MM-DD" / "YYYY-MM" / full ISO into its UTC calendar parts. */
+const utcParts = (value) => {
+  const s = String(value || '');
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return { y: +ymd[1], m: +ymd[2], d: +ymd[3], hasDay: true };
+  const ym = s.match(/^(\d{4})-(\d{2})$/);
+  if (ym) return { y: +ym[1], m: +ym[2], d: 1, hasDay: false };
+  const parsed = new Date(s);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return {
+    y: parsed.getUTCFullYear(), m: parsed.getUTCMonth() + 1,
+    d: parsed.getUTCDate(), hasDay: true,
+  };
+};
+
+/** 00:00:00.000 UTC on the given calendar day. */
+const startOfUtcDay = (value) => {
+  const p = utcParts(value);
+  if (!p) return new Date(NaN);
+  if (!p.hasDay) return new Date(Date.UTC(p.y, p.m - 1, 1));
+  return new Date(Date.UTC(p.y, p.m - 1, p.d));
+};
+
+/**
+ * 23:59:59.999 UTC on the given day - or on the LAST day of the month when only
+ * "YYYY-MM" is supplied, so a monthly report always covers the full month.
+ */
+const endOfUtcDay = (value) => {
+  const p = utcParts(value);
+  if (!p) return new Date(NaN);
+  if (!p.hasDay) return new Date(Date.UTC(p.y, p.m, 0, 23, 59, 59, 999));
+  return new Date(Date.UTC(p.y, p.m - 1, p.d, 23, 59, 59, 999));
+};
+
 const keyOf = (name, unit) =>
   `${String(name || '').trim().toLowerCase()}__${String(unit || '').trim().toLowerCase()}`;
 
@@ -396,12 +431,21 @@ const assembleMaterialReportData = async (site, materialId) => {
     throw new ApiError('Material not found for this site', 404);
   }
 
-  // Escape the name so a material literally called "Cement ( OPC )" still
-  // matches, and anchor the pattern so "Cement" does not pull in "Cement Sand".
-  const escaped = String(anchor.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Material identity in this schema: there is no material master/code field,
+  // so a Material document IS a purchase line. The engineer's "Cement report"
+  // therefore means every purchase of that name AND unit - matching exactly
+  // how rollupMaterials() buckets them. Filtering on name alone would pull in
+  // a different unit of the same material and make the purchase table disagree
+  // with the summary beneath it.
+  const nameQuery = {
+    $regex: `^${String(anchor.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    $options: 'i',
+  };
+  const unitQuery = { $regex: `^${String(anchor.unit || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' };
   const purchases = await Material.find({
     site: siteId,
-    name: { $regex: `^${escaped}$`, $options: 'i' },
+    name: nameQuery,
+    unit: unitQuery,
   }).populate('vendor', 'name').sort({ purchaseDate: 1 }).lean();
 
   const usages = await MaterialUsage.find({
@@ -507,17 +551,23 @@ const materialTotals = (rollup, purchases, usages) => {
   };
 };
 
-/** Builds a {from,to} range, or null for "all time". */
+/**
+ * Builds a {from,to} range, or null for "all time".
+ *
+ * TIMEZONE: purchaseDate / usage date are stored as the UTC instant of the
+ * calendar day the engineer typed (e.g. "2026-10-01" -> 2026-10-01T00:00:00Z).
+ * The boundaries are therefore built in UTC as well. Using local setHours()
+ * here would make results depend on the server's timezone - on a host running
+ * IST the month end would roll back to 18:29 UTC and silently drop records
+ * entered on the last day of the month.
+ */
 const periodFilter = (filters = {}) => {
   const { from, to } = filters;
   if (!from && !to) return null;
   const q = {};
-  if (from) q.$gte = new Date(from);
-  if (to) {
-    const end = new Date(to);
-    if (String(to).length <= 10) end.setHours(23, 59, 59, 999);
-    q.$lte = end;
-  }
+  // A bare YYYY-MM-DD (or YYYY-MM) selects the WHOLE day / month in UTC.
+  if (from) q.$gte = startOfUtcDay(from);
+  if (to) q.$lte = endOfUtcDay(to);
   return q;
 };
 

@@ -18,6 +18,23 @@ const documentSchema = new mongoose.Schema(
       required: [true, 'File name is required'],
       trim: true,
     },
+    /**
+     * Key of the object inside the configured storage provider
+     * (see services/storageService.js). For the local provider this is a path
+     * relative to UPLOAD_PATH; for S3/R2 it is the object key. Historical rows
+     * only have fileName, so readers fall back to it.
+     */
+    storageKey: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    /** 'local' | 's3' - which backend the row was written to. */
+    storageProvider: {
+      type: String,
+      trim: true,
+      default: 'local',
+    },
     originalName: {
       type: String,
       required: [true, 'Original name is required'],

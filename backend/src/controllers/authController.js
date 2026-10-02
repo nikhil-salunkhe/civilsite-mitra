@@ -5,6 +5,7 @@ const AuditLog = require('../models/AuditLog');
 const config = require('../config');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { ACCOUNT_STATUS, USER_ROLES } = require('../config/constants');
+const storage = require('../services/storageService');
 
 // Human readable text for each account status - used by login and the auth
 // middleware so the engineer always knows why they cannot get in.
@@ -114,7 +115,9 @@ const updateProfile = asyncHandler(async (req, res) => {
   const oldPhoto = user.profilePhoto;
 
   // An uploaded file takes precedence over any profilePhoto string in the body.
-  const uploadedPhoto = req.file ? `/uploads/${req.file.filename}` : profilePhoto;
+  // The file arrives as a memory buffer (multer.memoryStorage), so it is
+  // written through storageService rather than relying on a disk filename.
+  const uploadedPhoto = req.file ? await storage.saveProfilePhoto(req.file) : profilePhoto;
 
   // Multipart bodies only contain flat strings, so the client may send the
   // address either as a real object (JSON request) or as JSON text (FormData).
@@ -155,18 +158,11 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   await user.save();
 
-  // Best-effort: remove the replaced/removed photo file from disk (basename
-  // only, so a corrupted/foreign value can never escape the uploads folder).
-  if (oldPhoto && oldPhoto !== user.profilePhoto && oldPhoto.startsWith('/uploads/')) {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const cfg = require('../config');
-      const oldPath = path.join(cfg.upload.path, path.basename(oldPhoto));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    } catch (err) {
-      // file cleanup is best-effort; DB records are the source of truth
-    }
+  // Best-effort: remove the replaced/removed photo from storage. Key
+  // traversal is guarded inside the service, so a corrupted or foreign value
+  // can never reach outside the uploads folder.
+  if (oldPhoto && oldPhoto !== user.profilePhoto) {
+    await storage.removeProfilePhoto(oldPhoto);
   }
 
   res.status(200).json({

@@ -18,12 +18,27 @@ const ORIGIN = BASE.replace(/\/api\/?$/, '');
 const fs = require('fs');
 const path = require('path');
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
+// Counts real FILES, recursively. Uploads are stored under
+// photos/ documents/ profiles/ sub-folders, so a flat readdir of the upload
+// root would count a directory as one entry and could not detect a deleted
+// file at all.
 const countUploads = () => {
-  try {
-    return fs.readdirSync(UPLOADS_DIR).filter((f) => !f.startsWith('.')).length;
-  } catch (e) {
-    return 0;
-  }
+  const walk = (dir) => {
+    let total = 0;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      return 0;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      if (entry.isDirectory()) total += walk(path.join(dir, entry.name));
+      else total += 1;
+    }
+    return total;
+  };
+  return walk(UPLOADS_DIR);
 };
 const ENGINEER_A = {
   name: 'Priya Sharma', email: `priya.${RUN_ID}@test.com`, mobile: `91${RUN_SUFFIX}`,

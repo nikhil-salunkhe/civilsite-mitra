@@ -1,9 +1,10 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   Home, Building2, Users, User, UserPlus, Plus, Check, CheckCircle2, X,
   PauseCircle, Ban, PlayCircle, Flag, BarChart3, TrendingUp, ClipboardList,
   FileText, Settings, AlertTriangle, Search, Bell, LogOut, Menu, IndianRupee,
   Wallet, CalendarDays, MapPin, Crosshair, ExternalLink, LocateFixed, Loader2,
+  Image as ImageIcon, Trash2, Camera, Download,
 } from 'lucide-react';
 
 /**
@@ -53,6 +54,12 @@ const ICONS = {
   crosshair: Crosshair,
   externalLink: ExternalLink,
   locate: LocateFixed,
+  loader: Loader2,
+  // Added for the Site Photos gallery.
+  image: ImageIcon,
+  trash: Trash2,
+  camera: Camera,
+  download: Download,
   loader: Loader2,
 };
 

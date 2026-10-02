@@ -36,12 +36,12 @@ const {
   getActivities, createActivity, updateActivity, deleteActivity, updateProgress
 } = require('../controllers/activityController');
 const {
-  getDocuments, uploadDocument, deleteDocument, getDocumentFile
+  getDocuments, uploadDocument, uploadMultiplePhotos, deleteDocument, getDocumentFile
 } = require('../controllers/documentController');
 const reportController = require('../controllers/reportController');
 const { auth } = require('../middleware/auth');
 const { loadSite } = require('../middleware/siteAccess');
-const { uploadSingle } = require('../middleware/fileUpload');
+const { uploadSingle, uploadMultiple } = require('../middleware/fileUpload');
 
 // All routes require authentication
 router.use(auth);
@@ -152,6 +152,8 @@ router.delete('/:siteId/activities/:id', deleteActivity);
 // Documents
 router.get('/:siteId/documents', getDocuments);
 router.post('/:siteId/documents', uploadSingle, uploadDocument);
+// Gallery upload: many photos in one request (field name "files").
+router.post('/:siteId/photos', uploadMultiple, uploadMultiplePhotos);
 router.get('/:siteId/documents/:id/download', getDocumentFile);
 router.delete('/:siteId/documents/:id', deleteDocument);
 

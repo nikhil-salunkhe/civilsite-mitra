@@ -82,8 +82,18 @@ module.exports = {
   upload: {
     path: process.env.UPLOAD_PATH || './uploads',
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760,
-    allowedTypes: (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,image/gif,application/pdf')
+    // A gallery upload may carry several photos in one request.
+    maxFiles: parseInt(process.env.MAX_FILES_PER_UPLOAD) || 20,
+    allowedTypes: (process.env.ALLOWED_FILE_TYPES
+      || 'image/jpeg,image/png,image/gif,image/webp,application/pdf')
       .split(',')
       .map(type => type.trim()),
+    /**
+     * 'local' writes to UPLOAD_PATH (fine for development, lost on redeploy).
+     * 's3' uploads to any S3-compatible bucket - AWS S3 or Cloudflare R2.
+     * Read by services/storageService.js; the rest of the app is provider
+     * agnostic, so no credentials are exposed anywhere else.
+     */
+    storageProvider: (process.env.STORAGE_PROVIDER || 'local').toLowerCase(),
   },
 };

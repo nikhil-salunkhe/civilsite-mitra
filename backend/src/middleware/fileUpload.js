@@ -1,11 +1,10 @@
 const multer = require('multer');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 const { ApiError } = require('./errorHandler');
-
-// Ensure upload directory exists
 const fs = require('fs');
+
+// Ensure the local upload directory exists. Only meaningful for the local
+// storage provider, but harmless otherwise and keeps `uploads/` browsable.
 const uploadDir = config.upload.path;
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -28,17 +27,14 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const filename = `${uuidv4()}${ext}`;
-    cb(null, filename);
-  },
-});
+/**
+ * Uploaded files are buffered in memory rather than written straight to disk.
+ * That is what lets the same route serve both storage providers: the controller
+ * hands the buffer to storageService, which writes it to the filesystem or
+ * pushes it to S3/R2. Nothing is written to disk unless the local provider is
+ * actually configured.
+ */
+const storage = multer.memoryStorage();
 
 // Create multer instance
 const upload = multer({
@@ -46,7 +42,7 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: config.upload.maxFileSize,
-    files: 10,
+    files: config.upload.maxFiles || 10,
   },
 });
 

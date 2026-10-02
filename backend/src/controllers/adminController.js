@@ -14,11 +14,8 @@ const WorkerPayment = require('../models/WorkerPayment');
 const Progress = require('../models/Progress');
 const WorkerAttendance = require('../models/WorkerAttendance');
 const MaterialUsage = require('../models/MaterialUsage');
-const fs = require('fs');
-const path = require('path');
-const config = require('../config');
-const { asyncHandler } = require('../middleware/errorHandler');
-const { ApiError } = require('../middleware/errorHandler');
+const storage = require('../services/storageService');
+const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { ACCOUNT_STATUS, USER_ROLES } = require('../config/constants');
 const { calculateSystemFinancialSummary, calculateEngineerFinancialSummary, toObjectId } = require('../services/financialService');
 const { escapeRegex } = require('../utils/query');
@@ -211,7 +208,7 @@ const createEngineer = asyncHandler(async (req, res) => {
   });
 
   if (req.file) {
-    engineer.profilePhoto = `/uploads/${req.file.filename}`;
+    engineer.profilePhoto = await storage.saveProfilePhoto(req.file);
   }
 
   await engineer.save();
@@ -268,19 +265,14 @@ const updateEngineer = asyncHandler(async (req, res) => {
   if (notes !== undefined) engineer.notes = notes;
   if (mustChangePassword !== undefined) engineer.mustChangePassword = mustChangePassword;
   const oldPhoto = engineer.profilePhoto;
-  if (req.file) engineer.profilePhoto = `/uploads/${req.file.filename}`;
+  if (req.file) engineer.profilePhoto = await storage.saveProfilePhoto(req.file);
 
   await engineer.save();
 
-  // Best-effort: remove the replaced photo file from disk (basename only, so
-  // a corrupted/foreign value can never escape the uploads folder).
-  if (req.file && oldPhoto && oldPhoto !== engineer.profilePhoto && oldPhoto.startsWith('/uploads/')) {
-    try {
-      const oldPath = path.join(config.upload.path, path.basename(oldPhoto));
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    } catch (err) {
-      // file cleanup is best-effort; DB records are the source of truth
-    }
+  // Best-effort: remove the replaced photo through storageService, which
+  // guards key traversal internally.
+  if (req.file && oldPhoto && oldPhoto !== engineer.profilePhoto) {
+    await storage.removeProfilePhoto(oldPhoto);
   }
 
   await AuditLog.create({
@@ -560,29 +552,24 @@ const deleteEngineer = asyncHandler(async (req, res) => {
   const siteIds = sites.map((s) => s._id);
   const cascade = { sites: siteIds.length };
 
-  // Best-effort: remove uploaded document files from disk
+  // Best-effort: remove uploaded files through storageService so this also works
+  // when STORAGE_PROVIDER=s3 (where nothing is on the local disk at all).
   if (siteIds.length > 0) {
-    const documents = await Document.find({ site: { $in: siteIds } }).select('fileName');
-    documents.forEach((doc) => {
+    const documents = await Document.find({ site: { $in: siteIds } })
+      .select('fileName storageKey storageProvider');
+    // eslint-disable-next-line no-restricted-syntax
+    for (const doc of documents) {
       try {
-        const filePath = path.join(config.upload.path, doc.fileName);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        // eslint-disable-next-line no-await-in-loop
+        await storage.remove(doc.storageKey || doc.fileName);
       } catch (err) {
         // file cleanup is best-effort; DB records are the source of truth
       }
-    });
-  }
-
-  // Best-effort: remove the engineer's profile photo file as well (basename
-  // only, so a corrupted/foreign value can never escape the uploads folder).
-  if (engineer.profilePhoto && engineer.profilePhoto.startsWith('/uploads/')) {
-    try {
-      const photoPath = path.join(config.upload.path, path.basename(engineer.profilePhoto));
-      if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
-    } catch (err) {
-      // file cleanup is best-effort; DB records are the source of truth
     }
   }
+
+  // Best-effort: remove the engineer's profile photo too.
+  await storage.removeProfilePhoto(engineer.profilePhoto);
 
   // Delete every site-scoped record owned by this engineer
   if (siteIds.length > 0) {

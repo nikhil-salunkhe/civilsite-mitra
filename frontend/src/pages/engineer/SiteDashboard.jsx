@@ -13,6 +13,7 @@ import {
   Activity,
   FileText,
   FolderOpen,
+  Images,
 } from 'lucide-react';
 import { api } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -21,7 +22,7 @@ import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { money, dateFmt } from './siteTabs/shared';
 import TabPanel from './siteTabs';
 
-const TAB_NAMES = ['Overview', 'Payments', 'Installments', 'Workers', 'Attendance', 'Materials', 'Material Usage', 'Vendors', 'Expenses', 'Activities', 'Reports', 'Documents'];
+const TAB_NAMES = ['Overview', 'Payments', 'Installments', 'Workers', 'Attendance', 'Materials', 'Material Usage', 'Vendors', 'Expenses', 'Activities', 'Reports', 'Site Photos', 'Documents'];
 
 // One lucide icon per section - the icon + label pairing is what makes a
 // vertical tab rail scannable at a glance (industry-standard navigation).
@@ -37,6 +38,7 @@ const TAB_ICONS = {
   Expenses: Receipt,
   Activities: Activity,
   Reports: FileText,
+  'Site Photos': Images,
   Documents: FolderOpen,
 };
 
