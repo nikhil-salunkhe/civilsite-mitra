@@ -177,6 +177,15 @@ router.get(
   '/:siteId/reports/material-period/preview',
   reportController.getMaterialPeriodPreview,
 );
+// Same period and same rollup as the PDF, in Excel and CSV.
+router.get(
+  '/:siteId/reports/material-period/excel',
+  reportController.getMaterialPeriodExcel,
+);
+router.get(
+  '/:siteId/reports/material-period/csv',
+  reportController.getMaterialPeriodCsv,
+);
 
 module.exports = router;
 

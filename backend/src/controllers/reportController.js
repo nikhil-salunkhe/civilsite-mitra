@@ -12,6 +12,7 @@ const {
 const { buildSiteReportPdf } = require('../reports/siteReport');
 const { buildMaterialPdf } = require('../reports/materialReport');
 const { buildMaterialPeriodPdf, titleFor } = require('../reports/materialPeriodReport');
+const { buildMaterialPeriodWorkbook, buildMaterialPeriodCsv } = require('../exports/materialPeriodExport');
 const { buildSiteWorkbook } = require('../exports/excelExport');
 const { safeFileSlug, toIsoDate, buildReportFilename } = require('../utils/format');
 
@@ -572,6 +573,62 @@ const getMaterialPeriodPreview = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Shared helper for the two period-report exports. Loads the same rollup the
+ * PDF uses, so Excel, CSV and PDF can never disagree for one period.
+ */
+const loadPeriodReport = async (req) => {
+  const site = await findOwnedSite(req);
+  const period = resolvePeriod(req.query);
+  const data = await assembleMaterialPeriodData(site, {
+    from: period.from,
+    to: period.to,
+    type: period.type,
+    label: period.label,
+    material: req.query.material ? String(req.query.material).slice(0, 80) : null,
+    vendor: req.query.vendor ? String(req.query.vendor).slice(0, 80) : null,
+  });
+  await attachEngineer(site, data);
+  const scope = period.type === 'monthly' ? 'Monthly'
+    : period.type === 'weekly' ? 'Weekly' : 'Material';
+  return { site, data, filename: buildReportFilename(`${scope} Material Report`, site.siteName, 'xlsx') };
+};
+
+/**
+ * GET /api/sites/:siteId/reports/material-period/excel
+ * Same period, same rollup, five worksheets (Summary / Material Summary /
+ * Purchases / Usage / Vendor Summary) with frozen headers, filters and real
+ * numeric money cells.
+ */
+const getMaterialPeriodExcel = asyncHandler(async (req, res) => {
+  const { site, data, filename } = await loadPeriodReport(req);
+  const wb = await buildMaterialPeriodWorkbook(data, { site, engineer: data.engineer });
+  const buffer = await wb.xlsx.writeBuffer();
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Length', buffer.byteLength);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${filename.replace(/\.xlsx$/i, '.xlsx')}"`,
+  );
+  return res.send(Buffer.from(buffer));
+});
+
+/**
+ * GET /api/sites/:siteId/reports/material-period/csv
+ * UTF-8 (with BOM) so the rupee glyph and any Indian script survive Excel.
+ */
+const getMaterialPeriodCsv = asyncHandler(async (req, res) => {
+  const { site, data } = await loadPeriodReport(req);
+  const csv = buildMaterialPeriodCsv(data, { site, engineer: data.engineer });
+  const scope = data.period.type === 'monthly' ? 'Monthly'
+    : data.period.type === 'weekly' ? 'Weekly' : 'Material';
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${buildReportFilename(`${scope} Material Data`, site.siteName, 'csv')}"`);
+  return res.status(200).send(csv);
+});
+
 module.exports = {
   getReports,
   getSitePdfReport,
@@ -580,4 +637,6 @@ module.exports = {
   getMaterialPdfReport,
   getMaterialPeriodPdfReport,
   getMaterialPeriodPreview,
+  getMaterialPeriodExcel,
+  getMaterialPeriodCsv,
 };

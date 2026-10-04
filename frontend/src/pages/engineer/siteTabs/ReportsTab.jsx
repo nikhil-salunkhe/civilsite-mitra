@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { money, dateFmt } from './shared';
+import MaterialPeriodCard from './MaterialPeriodCard';
 
 /**
  * Reports tab - the site's permanent record, standardised for engineers:
@@ -293,6 +294,10 @@ const ReportsTab = ({ siteId }) => {
       </div>
 
       <SectionIndex meta={pickObj(data, ['meta']) || pickObj(data?.data, ['meta'])} />
+
+      {/* Weekly / monthly / custom material purchases and consumption, in
+          PDF, Excel and CSV - all from the same server-side rollup. */}
+      <MaterialPeriodCard siteId={siteId} />
 
       {summary && typeof summary === 'object' && (
         <div className="space-y-4">

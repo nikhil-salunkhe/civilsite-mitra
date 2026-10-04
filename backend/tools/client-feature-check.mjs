@@ -41,9 +41,9 @@ async function call(method, url, { token, body } = {}) {
     method, headers, body: body ? JSON.stringify(body) : undefined,
   });
   const type = res.headers.get('content-type') || '';
-  if (type.includes('json')) return { status: res.status, data: await res.json() };
+  if (type.includes('json')) return { status: res.status, data: await res.json(), headers: res.headers };
   const buf = Buffer.from(await res.arrayBuffer());
-  return { status: res.status, buf, type, size: buf.length };
+  return { status: res.status, buf, type, size: buf.length, headers: res.headers };
 }
 
 /** Unwraps the (non-uniform) backend response envelope. */
@@ -164,6 +164,40 @@ async function requirement4({ token, siteId }) {
 
   const empty = await call('GET', pdfUrl('?type=monthly&month=2027-01'), { token });
   check(empty.status === 200 && isPdf(empty), 'a period with zero records still renders a valid PDF', `${empty.size} bytes`);
+
+  // ---- Excel export of the same period ----
+  const xls = await call('GET', `/sites/${siteId}/reports/material-period/excel?type=monthly&month=2026-10`, { token });
+  check(xls.status === 200, 'period Excel responds 200', `status=${xls.status}`);
+  check(String(xls.type).includes('spreadsheetml'), 'Excel has an .xlsx content-type', xls.type);
+  check(xls.buf?.slice(0, 2).toString() === 'PK', 'Excel is a real .xlsx container', `${xls.size} bytes`);
+  check(/attachment; filename="CivilSiteMitra_Monthly_Material_Report/.test(
+    xls.headers?.get?.('content-disposition') || '',
+  ), 'Excel filename follows the CivilSiteMitra convention',
+  xls.headers?.get?.('content-disposition') || '');
+
+  // ---- CSV export of the same period ----
+  const csv = await call('GET', `/sites/${siteId}/reports/material-period/csv?type=monthly&month=2026-10`, { token });
+  check(csv.status === 200, 'period CSV responds 200', `status=${csv.status}`);
+  check(String(csv.type).includes('text/csv'), 'CSV content-type', csv.type);
+  const csvText = csv.buf ? csv.buf.toString('utf8') : '';
+  check(csvText.charCodeAt(0) === 0xFEFF, 'CSV starts with a UTF-8 BOM for Excel');
+  check(csvText.includes('# CivilSiteMitra - Material Purchase & Usage Report'), 'CSV has the branded header');
+  check(csvText.includes('October 2026'), 'CSV states the period');
+  check(csvText.includes('# Material Summary') && csvText.includes('# Purchase Details')
+    && csvText.includes('# Usage Details') && csvText.includes('# Vendor Purchase Summary')
+    && csvText.includes('# Total Summary'), 'CSV has every report block');
+  check(!/\[object Object\]|NaN|Infinity|undefined/.test(csvText), 'CSV has no [object Object]/NaN/undefined');
+  check(!/mongodb:\/\//.test(csvText) && !/_id/.test(csvText), 'CSV leaks no internal fields');
+  // Every quoted field must be closed.
+  const quotes = (csvText.match(/"/g) || []).length;
+  check(quotes % 2 === 0, 'CSV quoting is balanced', `${quotes} quotes`);
+
+  // ---- cross-format consistency for the SAME period ----
+  const prevXls = await call('GET', `/sites/${siteId}/reports/material-period/preview?type=monthly&month=2026-10`, { token });
+  const prevTotal = prevXls.data?.data?.totals?.totalPurchaseAmount;
+  check(typeof prevTotal === 'number' && prevTotal > 0, 'preview reports a positive period total', `total=${prevTotal}`);
+  check(csvText.includes(`Total Purchase Amount (INR),${prevTotal.toFixed(2)}`),
+    'CSV total equals the preview total for the same period', `csv matches ${prevTotal}`);
 
   // ---- preview must agree with the PDF it summarises ----
   const prev = await call('GET', prevUrl('?type=monthly&month=2026-10'), { token });
@@ -304,6 +338,17 @@ async function isolation({ siteId, cementId, photoId, adminToken, otherToken }) 
 
   const a2 = await call('GET', `/sites/${siteId}/reports/material-period`);
   check(a2.status === 401, 'unauthenticated period report request is rejected', `status=${a2.status}`);
+// The new period exports must sit behind the same ownership + auth checks.
+  for (const fmt of ['excel', 'csv']) {
+    const steal = await call(
+      'GET',
+      `/sites/${siteId}/reports/material-period/${fmt}?type=monthly&month=2026-10`,
+      { token: otherToken },
+    );
+    check(steal.status === 404, `engineer B cannot export A's period ${fmt.toUpperCase()}`, `status=${steal.status}`);
+    const anonFmt = await call('GET', `/sites/${siteId}/reports/material-period/${fmt}`);
+    check(anonFmt.status === 401, `unauthenticated period ${fmt.toUpperCase()} is rejected`, `status=${anonFmt.status}`);
+  }
 
   const adm = await call('GET', `/sites/${siteId}/reports/material/${cementId}/pdf`, { token: adminToken });
   check(adm.status === 200, 'super admin may export any site material PDF', `status=${adm.status}`);
