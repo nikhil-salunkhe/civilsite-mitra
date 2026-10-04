@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "check:auth": "node tools/auth-flow-check.js",
     "check:design": "node tools/design-audit.mjs",
-    "check": "npm run check:auth && npm run check:design && npm run check:api && npm run check:bugs",
+    "check": "npm run check:auth && npm run check:design && npm run check:api && npm run check:bugs && npm run check:jsx",
     "check:bugs": "node tools/bug-hunt.mjs",
+    "check:jsx": "node tools/undefined-jsx-check.mjs",
     "check:api": "node tools/api-contract-check.mjs"
   },
   "dependencies": {
