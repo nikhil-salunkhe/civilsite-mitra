@@ -1,0 +1,9 @@
+# CivilSiteMitra SPA fallback (Netlify / Cloudflare Pages).
+#
+# The frontend is a client-routed React app: any unknown path must be served
+# index.html so React Router can resolve it. Without this rule, opening a deep
+# link such as /terms-and-conditions or /sites/:id directly (or refreshing the
+# page) returns Netlify's 404 instead of the app.
+#
+# Assets are excluded because real files under /assets/* must win.
+/*    /index.html   200

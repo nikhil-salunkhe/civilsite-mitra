@@ -21,6 +21,7 @@ import { CreateSite } from './pages/engineer/CreateSite';
 import { SiteDashboard } from './pages/engineer/SiteDashboard';
 import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { TermsAndConditions } from './pages/legal/TermsAndConditions';
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { isAuthenticated, isAdmin, loading, mustChangePassword } = useAuth();
@@ -52,6 +53,8 @@ const AppRoutes = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={isAuthenticated ? <Navigate to={isAdmin ? "/admin/dashboard" : "/dashboard"} replace /> : <LoginPage />} />
+      {/* Unauthenticated legal page - must be declared before the "/" and "*" routes. */}
+      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminLayout /></ProtectedRoute>}>

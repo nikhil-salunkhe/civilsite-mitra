@@ -256,6 +256,14 @@ export const LoginPage = () => {
         <p className="text-center text-xs text-gray-500 mt-6">
           &copy; {new Date().getFullYear()} CivilSiteMitra by TechMitra Technology
         </p>
+        <p className="mt-2 text-center text-xs text-gray-500">
+          <Link
+            to="/terms-and-conditions"
+            className="rounded underline underline-offset-2 hover:text-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+          >
+            Terms &amp; Conditions
+          </Link>
+        </p>
       </div>
     </div>
   );
