@@ -69,6 +69,22 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Terms & Conditions acceptance. Engineers created by the Super Admin
+    // must read and accept the current T&C version before they can use the
+    // system. `termsVersion` pins WHICH revision was accepted, so publishing a
+    // new version can require re-acceptance.
+    termsAccepted: {
+      type: Boolean,
+      default: false,
+    },
+    termsAcceptedAt: {
+      type: Date,
+      default: null,
+    },
+    termsVersion: {
+      type: String,
+      default: null,
+    },
     notes: {
       type: String,
       trim: true,
@@ -132,6 +148,10 @@ userSchema.methods.getPublicProfile = function () {
     profilePhoto: this.profilePhoto,
     lastLogin: this.lastLogin,
     accountStartDate: this.accountStartDate,
+    // Exposed so the client can decide whether to force the T&C gate. No
+    // sensitive field is added here.
+    termsAccepted: this.termsAccepted,
+    termsVersion: this.termsVersion,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

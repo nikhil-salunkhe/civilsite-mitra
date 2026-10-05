@@ -99,6 +99,17 @@ const DEFAULT_INSTALLMENTS = [
   { name: 'Final', order: 5 },
 ];
 
+/**
+ * Revision of the Terms & Conditions an engineer must accept.
+ *
+ * Bump this when the T&C text materially changes. Engineers who already
+ * accepted an older revision are then re-prompted on next sign-in, which is
+ * why the accepted revision is stored on the user rather than as a boolean.
+ * Must stay in step with LAST_UPDATED in
+ * frontend/src/pages/legal/termsContent.js
+ */
+const TERMS_VERSION = '2026-10';
+
 module.exports = {
   ACCOUNT_STATUS,
   USER_ROLES,
@@ -110,4 +121,5 @@ module.exports = {
   SITE_STATUS,
   DOCUMENT_TYPES,
   DEFAULT_INSTALLMENTS,
+  TERMS_VERSION,
 };

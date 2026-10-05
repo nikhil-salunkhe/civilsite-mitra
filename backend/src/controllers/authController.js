@@ -4,7 +4,7 @@ const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const config = require('../config');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
-const { ACCOUNT_STATUS, USER_ROLES } = require('../config/constants');
+const { ACCOUNT_STATUS, USER_ROLES, TERMS_VERSION } = require('../config/constants');
 const storage = require('../services/storageService');
 
 // Human readable text for each account status - used by login and the auth
@@ -16,6 +16,20 @@ const STATUS_MESSAGES = {
 };
 
 const COOKIE_NAME = 'csm_token';
+
+/**
+ * Whether this user still has to accept the current Terms & Conditions.
+ *
+ * Engineers provisioned by the Super Admin start with termsAccepted = false,
+ * so they are held at the T&C gate on first sign-in. Acceptance is pinned to a
+ * revision, so publishing a new version re-prompts everyone who accepted an
+ * older one. Super Admins are exempt - they publish the terms rather than
+ * being asked to agree to them.
+ */
+const mustAcceptTerms = (user) => {
+  if (user.role === USER_ROLES.SUPER_ADMIN) return false;
+  return !user.termsAccepted || user.termsVersion !== TERMS_VERSION;
+};
 
 const cookieOptions = {
   httpOnly: true,
@@ -68,6 +82,8 @@ const login = asyncHandler(async (req, res) => {
     data: {
       user: user.getPublicProfile(),
       mustChangePassword: user.mustChangePassword,
+      mustAcceptTerms: mustAcceptTerms(user),
+      termsVersion: TERMS_VERSION,
     },
   });
 });
@@ -98,6 +114,42 @@ const getMe = asyncHandler(async (req, res) => {
     data: {
       user: user.getPublicProfile(),
       mustChangePassword: user.mustChangePassword,
+      mustAcceptTerms: mustAcceptTerms(user),
+      termsVersion: TERMS_VERSION,
+    },
+  });
+});
+
+// POST /api/auth/accept-terms
+//
+// Records that the signed-in user read and accepted the current Terms &
+// Conditions. Only the acceptance metadata is written - never the IP, the
+// password, or anything else that would make this an audit trail the user
+// cannot control. An AuditLog entry is left to the admin-facing audit system.
+const acceptTerms = asyncHandler(async (req, res) => {
+  const { accepted } = req.body || {};
+
+  if (accepted !== true) {
+    throw new ApiError('You must accept the Terms & Conditions to continue', 400);
+  }
+
+  const user = await User.findById(req.userId);
+  if (!user) {
+    throw new ApiError('User not found', 404);
+  }
+
+  user.termsAccepted = true;
+  user.termsAcceptedAt = new Date();
+  user.termsVersion = TERMS_VERSION;
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Terms & Conditions accepted',
+    data: {
+      termsAccepted: true,
+      termsAcceptedAt: user.termsAcceptedAt,
+      termsVersion: user.termsVersion,
     },
   });
 });
@@ -323,5 +375,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   adminResetPassword,
+  acceptTerms,
   generateToken,
 };

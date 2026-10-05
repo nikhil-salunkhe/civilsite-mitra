@@ -24,7 +24,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { TermsAndConditions } from './pages/legal/TermsAndConditions';
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
-  const { isAuthenticated, isAdmin, loading, mustChangePassword } = useAuth();
+  const { isAuthenticated, isAdmin, loading, mustChangePassword, mustAcceptTerms } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
@@ -32,6 +32,15 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Engineers provisioned by the Super Admin must read and accept the current
+  // Terms & Conditions before they can use the system. The terms page is the
+  // one route they are allowed to reach, otherwise the gate would trap them in
+  // a redirect loop. This runs BEFORE the password gate so the flow is
+  // read the terms -> set the temporary password -> use the app.
+  if (mustAcceptTerms && window.location.pathname !== '/terms-and-conditions') {
+    return <Navigate to="/terms-and-conditions" replace />;
   }
 
   // First login with a temporary password must be changed before anything else.

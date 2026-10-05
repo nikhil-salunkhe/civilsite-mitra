@@ -134,6 +134,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [mustAcceptTerms, setMustAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -150,6 +151,7 @@ export const AuthProvider = ({ children }) => {
           const profile = data.data.user;
           setUser(profile);
           setMustChangePassword(Boolean(data.data.mustChangePassword));
+          setMustAcceptTerms(Boolean(data.data.mustAcceptTerms));
           localStorage.setItem('user', JSON.stringify(profile));
         }
       } catch (error) {
@@ -172,6 +174,7 @@ export const AuthProvider = ({ children }) => {
       onAuthFailure(() => {
         setUser(null);
         setMustChangePassword(false);
+        setMustAcceptTerms(false);
         navigate('/login', { replace: true });
       }),
     [navigate]
@@ -185,9 +188,30 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(profile));
     setUser(profile);
     setMustChangePassword(Boolean(data.data.mustChangePassword));
+    setMustAcceptTerms(Boolean(data.data.mustAcceptTerms));
 
-    return { user: profile, mustChangePassword: Boolean(data.data.mustChangePassword) };
+    return {
+      user: profile,
+      mustChangePassword: Boolean(data.data.mustChangePassword),
+      mustAcceptTerms: Boolean(data.data.mustAcceptTerms),
+    };
   }, []);
+
+  /**
+   * Records acceptance of the Terms & Conditions.
+   * The gate is cleared locally as well as server-side so the user is not
+   * bounced back to the terms page by the route guard on the next navigation.
+   */
+  const acceptTerms = useCallback(async () => {
+    const { data } = await api.post('/auth/accept-terms', { accepted: true });
+    setMustAcceptTerms(false);
+    if (user) {
+      const updated = { ...user, termsAccepted: true, termsVersion: data.data.termsVersion };
+      setUser(updated);
+      localStorage.setItem('user', JSON.stringify(updated));
+    }
+    return data.data;
+  }, [user]);
 
   const logout = useCallback(async () => {
     // Tear the session down synchronously, and only then leave the screen.
@@ -261,10 +285,12 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     mustChangePassword,
+    mustAcceptTerms,
     login,
     logout,
     updateProfile,
     changePassword,
+    acceptTerms,
     refreshProfile,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'SUPER_ADMIN',

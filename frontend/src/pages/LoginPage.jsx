@@ -35,8 +35,12 @@ export const LoginPage = () => {
     try {
       const result = await login(email, password);
       toast.success('Login successful!');
-      
-      if (result.user.role === 'SUPER_ADMIN') {
+
+      // A newly provisioned engineer has not accepted the Terms & Conditions yet,
+      // so send them there first instead of bouncing them off the route guard.
+      if (result.mustAcceptTerms) {
+        navigate('/terms-and-conditions', { replace: true });
+      } else if (result.user.role === 'SUPER_ADMIN') {
         navigate('/admin/dashboard');
       } else {
         navigate('/dashboard');

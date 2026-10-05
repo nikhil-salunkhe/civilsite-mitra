@@ -22,5 +22,6 @@ router.get('/me', auth, authController.getMe);
 // a profile picture which the controller stores under /uploads.
 router.put('/profile', auth, upload.single('photo'), authController.updateProfile);
 router.post('/change-password', auth, authController.changePassword);
+router.post('/accept-terms', auth, authController.acceptTerms);
 
 module.exports = router;
