@@ -16,7 +16,8 @@
     "check:photos": "node tools/photo-storage-check.mjs",
     "check:pdf-visual": "node tools/pdf-visual-check.mjs",
     "check:exports": "node tools/export-audit-check.mjs",
-    "check:terms": "node tools/terms-gate-check.mjs"
+    "check:terms": "node tools/terms-gate-check.mjs",
+    "check:tenant": "node --env-file=.env tools/cross-tenant-check.mjs"
   },
   "dependencies": {
     "express": "^4.18.2",
