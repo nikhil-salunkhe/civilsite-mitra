@@ -1,61 +1,62 @@
 ﻿# CivilSiteMitra - Site Project Report
-# Site: Urul site
-# Owner: Nikhil salunkhe
+# Site: Umbraj
+# Owner: xyz
 # Engineer: Nikhil Ramesh Salunkhe
-# Generated: 2026-10-01
+# Generated: 2026-10-08
 # Site Information
 Field,Value
-Site Name,Urul site
-Owner Name,Nikhil salunkhe
+Site Name,Umbraj
+Owner Name,xyz
 Owner Mobile,9764149564
-Address,urul
-City,patan
+Address,umbraj
+City,karad
 State,maharashtra
 Status,Active
-Area,1200 Sq.Ft
+Area,1700 Sq.Ft
 Rate,1600.00
-Project Value,1920000.00
-Start Date,2026-09-26
-Expected Completion,2026-09-26
-Overall Progress %,25
+Project Value,2720000.00
+Start Date,2026-10-01
+Expected Completion,2026-12-01
+Overall Progress %,0
 Engineer,Nikhil Ramesh Salunkhe
 Company,techmitra
 
 # Investment & Profit
 Head,Amount (INR)
-Project Value (INR),1920000.00
-Total Received (INR),800000.00
-Pending Receivable (INR),1120000.00
-Material Cost (INR),32000.00
-Worker Cost (INR),0.00
-Vendor Cost (INR),32000.00
-Other Expenses (INR),5000.00
-Total Investment Committed (INR),69000.00
-Investment Paid (INR),69000.00
-Outstanding Payable (INR),0.00
-Estimated Profit (INR),1851000.00
-Profit Margin (%),96.41
+Project Value (INR),2720000.00
+Total Received (INR),1700000.00
+Pending Receivable (INR),1020000.00
+Material Cost (INR),45000.00
+Worker Cost (INR),50000.00
+Vendor Cost (INR),15000.00
+Other Expenses (INR),0.00
+Total Investment Committed (INR),110000.00
+Investment Paid (INR),105000.00
+Outstanding Payable (INR),5000.00
+Estimated Profit (INR),2610000.00
+Profit Margin (%),95.96
 
 # Payments Received
 Date,Amount,Mode,Reference,Notes
-2026-09-30,500000.00,Cash,,
-2026-09-26,300000.00,Cash,,Payment done
+2026-10-08,700000.00,UPI,,
+2026-10-01,1000000.00,Cash,,
 
 # Installments
 Order,Name,Amount,Paid,Pending,Due Date,Payment Date,Mode,Status
-1,Foundation,300000.00,300000.00,0.00,2026-09-26,,,Paid
-2,Plinth Level,500000.00,500000.00,0.00,2026-09-30,,,Paid
+1,Advance / Booking,1000000.00,1000000.00,0.00,2026-10-01,,,Paid
 
 # Workers
 Name,Mobile,Type,Daily Wage,Work Days,Total Amount,Paid,Pending,Joining Date,Status
-Nikhil Ramesh Salunkhe,9764149564,Labour,50000.00,0,0.00,0.00,0.00,2026-09-26,Active
+Nikhil Ramesh Salunkhe,9764149564,Labour,50000.00,1,50000.00,50000.00,0.00,2026-09-26,Active
 
 # Worker Payments
 Date,Worker,Work Days,Daily Wage,Total,Paid,Pending,Status,Payment Date,Mode
+2026-10-01,Nikhil Ramesh Salunkhe,1,50000.00,50000.00,50000.00,0.00,Paid,2026-10-01,Cash
 
 # Materials
 Purchase Date,Material,Category,Vendor,Quantity,Unit,Rate,Total,Paid,Pending,Invoice,Status
-2026-09-26,ultratech,Cement,,100,Bags,320.00,32000.00,32000.00,0.00,,Paid
+2026-10-08,Cement,Cement,,100,Kg,300.00,30000.00,25000.00,5000.00,001,Partial
+2026-10-01,cement,Cement,,50,Bags,300.00,15000.00,15000.00,0.00,,Paid
 
 # Vendors
 Name,Mobile,Email,City,Category,Materials,Total Purchases,Paid,Pending
@@ -63,8 +64,7 @@ Nikhil Ramesh Salunkhe,9764149564,nikhilrs6464@gmail.com,,,0,0.00,0.00,0.00
 
 # Vendor Payments
 Date,Vendor,Material,Quantity,Unit,Amount,Mode,Reference,Notes
-2026-09-26,Nikhil Ramesh Salunkhe,,,,32000.00,Cash,,
+2026-10-01,Nikhil Ramesh Salunkhe,,,,15000.00,Cash,,
 
 # Site Expenses
 Date,Category,Description,Amount,Paid,Pending,Status,Mode
-2026-09-26,JCB,.....,5000.00,5000.00,0.00,Paid,

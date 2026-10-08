@@ -6,7 +6,7 @@
  *   - table headers repeated on continuation pages
  *   - no row split across a page break
  *   - A4 media box
- *   - INR formatting and the rupee glyph
+ *   - INR formatting in "Rs." form (Helvetica/WinAnsi cannot draw U+20B9)
  *   - long vendor names wrapped, never clipped
  *   - no NaN / undefined / Infinity / ObjectId leakage
  *
@@ -123,7 +123,11 @@ async function main() {
   check(oneText.includes('PURCHASE HISTORY'), 'purchase history block');
   check(oneText.includes('VENDOR SUMMARY'), 'vendor summary block');
   check(oneText.includes(oneData.site.siteName), 'site name shown');
-  check(one.text.some((t) => /\u20B9[\d,]+/.test(t)), 'INR amounts with the rupee glyph');
+  // "Rs." is the only INR prefix PDFKit's Helvetica can actually draw: the
+  // rupee sign (U+20B9) is not in WinAnsi and would render as a stray
+  // superscript "1", so both the glyph's absence and the "Rs." form are checked.
+  check(one.text.some((t) => /Rs\. [\d,]+/.test(t)), 'INR amounts in "Rs." format');
+  check(!one.text.some((t) => t.includes('\u20B9')), 'no unsupported rupee glyph drawn');
   check(!/NaN|undefined|Infinity/.test(oneText), 'no NaN / undefined / Infinity');
   check(!/[0-9a-f]{24}/.test(oneText), 'no MongoDB ObjectId leaked');
 

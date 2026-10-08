@@ -21,7 +21,7 @@ const errorHandler = (err, req, res, next) => {
 
   // Log error in development
   if (process.env.NODE_ENV === 'development') {
-    console.error(`❌ ERROR: ${err.message}`);
+    console.error(`ERROR: ${err.message}`);
     console.error(err.stack);
   }
 

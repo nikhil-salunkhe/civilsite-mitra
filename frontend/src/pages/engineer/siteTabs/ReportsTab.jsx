@@ -9,7 +9,7 @@ import MaterialPeriodCard from './MaterialPeriodCard';
  * the screen preview, the A4 PDF (print / file / submit), the Excel workbook
  * and the CSV bundle all show the SAME numbered sections in the SAME order:
  *   1. Project Particulars (site • owner • engineer • contract value)
- *   2. Financial Summary (contract ↔ investment ↔ cash ↔ profit)
+ *   2. Financial Summary (contract / investment / cash / profit)
  *   3. Owner Collection (installment schedule + receipts)
  *   4. Labour Register (workers + paid / due)
  *   5. Attendance Register (summary + recent rows)

@@ -15,6 +15,7 @@
     "check:features": "node tools/client-feature-check.mjs",
     "check:photos": "node tools/photo-storage-check.mjs",
     "check:pdf-visual": "node tools/pdf-visual-check.mjs",
+    "preview:pdf": "node tools/pdf-preview.mjs",
     "check:exports": "node tools/export-audit-check.mjs",
     "check:terms": "node tools/terms-gate-check.mjs",
     "check:tenant": "node --env-file=.env tools/cross-tenant-check.mjs"

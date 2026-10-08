@@ -38,7 +38,8 @@ const purchaseColumns = () => ([
   { label: 'Quantity', w: 0.16, align: 'right' },
   { label: 'Rate', w: 0.15, align: 'right' },
   { label: 'Amount', w: 0.17, align: 'right' },
-  { label: 'Status', w: 0.12, align: 'center' },
+  // Colour the status cell per row: green settled, amber still owed.
+  { label: 'Status', w: 0.12, align: 'center', colorOf: (cells) => statusColor(cells[5]) },
 ]);
 
 const purchaseRows = (purchases) => purchases.map((p) => [

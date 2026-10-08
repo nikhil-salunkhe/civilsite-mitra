@@ -45,7 +45,10 @@ const inr = (value) => {
   const last3 = intPart.slice(-3);
   const rest = intPart.slice(0, -3);
   const grouped = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${last3}` : last3;
-  return `${num < 0 ? '-' : ''}\u20B9${grouped}${decPart ? `.${decPart}` : ''}`;
+  // "Rs." rather than the rupee sign: PDFKit's built-in Helvetica is WinAnsi
+  // and maps U+20B9 to byte 0xB9, which renders as "1" - superscript one.
+  // The site and admin dossiers use the same "Rs." convention for the reason.
+  return `${num < 0 ? '-' : ''}Rs. ${grouped}${decPart ? `.${decPart}` : ''}`;
 };
 
 /** 21 Sep 2026 */
@@ -79,7 +82,10 @@ const createDoc = () => new PDFDocument({
 
 /** Letterhead for page 1 of a standalone report. Returns the start y. */
 const drawHeader = (doc, { title, subtitle, site, engineer, generatedOn }) => {
-  doc.rect(0, 0, PAGE_W, 74).fill(COLORS.primary);
+  // Same navy letterhead + blue accent strip as the site dossier, so every
+  // CivilSiteMitra PDF opens with one recognisable brand block.
+  doc.rect(0, 0, PAGE_W, 74).fill(COLORS.navy);
+  doc.rect(0, 74, PAGE_W, 2.4).fill(COLORS.primary);
   doc.font(F.bold).fontSize(15).fillColor('#ffffff')
     .text('CivilSiteMitra', MARGIN, 16, { width: CONTENT_W * 0.6, height: 20, lineBreak: false });
   doc.font(F.normal).fontSize(8).fillColor('#dbeafe')
@@ -118,13 +124,15 @@ const drawHeader = (doc, { title, subtitle, site, engineer, generatedOn }) => {
   return 154;
 };
 
-/** Section heading with a rule underneath. */
+/** Section heading on a tinted band, matching the site dossier style. */
 const section = (doc, text, y) => {
-  doc.font(F.bold).fontSize(9.4).fillColor(COLORS.navy)
-    .text(String(text).toUpperCase(), MARGIN, y, { width: CONTENT_W, height: 13, lineBreak: false });
-  doc.moveTo(MARGIN, y + 15).lineTo(MARGIN + CONTENT_W, y + 15)
+  doc.rect(MARGIN, y - 3, CONTENT_W, 17).fill(COLORS.primarySoft);
+  doc.rect(MARGIN, y - 2, 3, 15).fill(COLORS.primary);
+  doc.font(F.bold).fontSize(9.4).fillColor(COLORS.primary)
+    .text(String(text).toUpperCase(), MARGIN + 8, y, { width: CONTENT_W - 8, height: 13, lineBreak: false });
+  doc.moveTo(MARGIN, y + 17).lineTo(MARGIN + CONTENT_W, y + 17)
     .lineWidth(0.7).strokeColor(COLORS.line).stroke();
-  return y + 21;
+  return y + 23;
 };
 
 /** Two/three-column key/value block (material information style). */
@@ -160,8 +168,8 @@ const table = (doc, opts) => {
   const usable = CONTENT_W - gap * (columns.length - 1);
 
   const header = () => {
-    doc.rect(MARGIN, y, CONTENT_W, 17).fill(COLORS.band);
-    doc.font(F.bold).fontSize(7).fillColor(COLORS.navy);
+    doc.rect(MARGIN, y, CONTENT_W, 17).fill(COLORS.primary);
+    doc.font(F.bold).fontSize(7).fillColor('#ffffff');
     let x = MARGIN;
     for (const col of columns) {
       doc.text(String(col.label).toUpperCase(), x + 4, y + 5, {
@@ -199,8 +207,11 @@ const table = (doc, opts) => {
     let x = MARGIN;
     columns.forEach((col, ci) => {
       const isNumeric = col.align === 'right';
+      // colorOf(cells, rowIndex) lets a column colour individual cells
+      // (e.g. green PAID / amber PENDING) without a per-row lookup table.
+      const tone = typeof col.colorOf === 'function' ? col.colorOf(cells, i) : null;
       doc.font(isNumeric ? F.bold : F.normal).fontSize(7.6)
-        .fillColor(col.color || COLORS.text)
+        .fillColor(tone || col.color || COLORS.text)
         .text(String(cells[ci] ?? ''), x + 4, y + 4, {
           width: col.w * usable - 8, height: rowH - 8, align: col.align || 'left', lineBreak: true,
         });

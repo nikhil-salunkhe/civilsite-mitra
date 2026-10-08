@@ -209,7 +209,7 @@ export const EngineerDashboard = () => {
     <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
       <div className="min-w-0">
         <h1 className="text-2xl font-bold text-gray-900 break-words">
-          {greeting()}, {name} <span aria-hidden="true">👋</span> {/* design-audit-allow: greeting per product spec */}
+          {greeting()}, {name}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           Construction project overview and financial summary for your sites.

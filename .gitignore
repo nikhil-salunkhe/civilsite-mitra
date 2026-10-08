@@ -27,3 +27,6 @@ Thumbs.db
 *.log
 *.err
 server.log
+
+# Generated report previews (backend/tools/pdf-preview.mjs)
+backend/.preview/

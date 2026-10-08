@@ -43,6 +43,10 @@ const COLORS = {
   success: '#15803d',
   warning: '#b45309',
   danger: '#b91c1c',
+  // Chart palette (kept distinct from the status tones above so a bar chart
+  // can never be mistaken for a paid/unpaid indicator).
+  sky: '#0284c7',
+  amber: '#d97706',
 };
 
 const F = { bold: 'Helvetica-Bold', normal: 'Helvetica', italic: 'Helvetica-Oblique' };
@@ -67,6 +71,19 @@ const plain = (value, suffix = '') => `${formatIndianNumber(value)}${suffix}`;
  * Only genuinely missing values (null/undefined) become the not-recorded dash.
  */
 const dash = (value) => (value === null || value === undefined ? '-' : String(value));
+
+/**
+ * Colour for a printed status cell: green settled, amber partial, red due.
+ * Returns null for anything unrecognised so the cell keeps the default colour
+ * and an unknown status can never render as "paid green" by accident.
+ */
+const statusColorFor = (value) => {
+  const s = String(value === null || value === undefined ? '' : value).trim().toLowerCase();
+  if (['paid', 'fully paid', 'completed', 'settled'].includes(s)) return COLORS.success;
+  if (['partial', 'partially paid', 'part paid', 'in progress', 'on hold'].includes(s)) return COLORS.warning;
+  if (['unpaid', 'pending', 'overdue', 'due'].includes(s)) return COLORS.danger;
+  return null;
+};
 
 /**
  * Latest recorded purchase rate for a material, matched on name and - when both
@@ -213,7 +230,8 @@ const buildSiteReportPdf = (data) => {
   const section = (no, title) => {
     need(34);
     y += 10;
-    doc.rect(MARGIN, y - 1, 3, 11).fill(COLORS.primary);
+    doc.rect(MARGIN, y - 4, CONTENT_W, 16).fill(COLORS.primarySoft);
+    doc.rect(MARGIN, y - 3, 3, 14).fill(COLORS.primary);
     line(`${no ? `${no}.  ` : ''}${String(title).toUpperCase()}`, MARGIN + 8, y, {
       font: F.bold, size: 9, color: COLORS.primary,
     });
@@ -243,16 +261,18 @@ const buildSiteReportPdf = (data) => {
    *  - the header repeats on each continuation page
    *  - the header can never be left alone at the foot of a page (need() reserves
    *    header + one row before it is drawn)
+   *  - opts.tones maps a column index to (value) => color so status columns
+   *    (Paid / Pending / Overdue ...) can be colour-coded at a glance
    */
   const table = (columns, rows, opts = {}) => {
-    const { totals = null, note = null } = opts;
+    const { totals = null, note = null, tones = {} } = opts;
 
     const drawHead = (continued) => {
       need(HEAD_H + ROW_H);
-      doc.rect(MARGIN, y, CONTENT_W, HEAD_H).fill(COLORS.band);
+      doc.rect(MARGIN, y, CONTENT_W, HEAD_H).fill(COLORS.primary);
       let x = MARGIN;
       columns.forEach((col) => {
-        doc.font(F.bold).fontSize(7.2).fillColor(COLORS.navy)
+        doc.font(F.bold).fontSize(7.2).fillColor('#ffffff')
           .text(String(col.label).toUpperCase(), x + 4, y + 4, {
             width: col.w - 8,
             height: 10,
@@ -263,7 +283,6 @@ const buildSiteReportPdf = (data) => {
         x += col.w;
       });
       y += HEAD_H;
-      if (continued) rule(COLORS.band, 0.5, 0);
       inked = true;
     };
 
@@ -282,6 +301,7 @@ const buildSiteReportPdf = (data) => {
         const col = columns[cellIndex];
         if (!col) return;
         const numeric = col.align === 'right';
+        const tone = typeof tones[cellIndex] === 'function' ? tones[cellIndex](value) : null;
         line(
           value,
           x + 4,
@@ -289,7 +309,7 @@ const buildSiteReportPdf = (data) => {
           {
             font: numeric ? F.normal : F.normal,
             size: 7.8,
-            color: COLORS.text,
+            color: tone || COLORS.text,
             width: col.w - 8,
             align: col.align,
           }
@@ -385,6 +405,78 @@ const buildSiteReportPdf = (data) => {
       doc.roundedRect(MARGIN, y, Math.max(4, (CONTENT_W * value) / 100), 6, 3).fill(COLORS.success);
     }
     y += 14;
+    inked = true;
+  };
+
+  /** One horizontal share bar: label, proportional track, right-aligned figure. */
+  const shareBar = (label, value, max, tone, rightText) => {
+    const trackX = MARGIN + CONTENT_W * 0.34;
+    const trackW = CONTENT_W * 0.24;
+    line(label, MARGIN, y, { font: F.normal, size: 7.6, color: COLORS.text, width: CONTENT_W * 0.33 });
+    doc.roundedRect(trackX, y + 2.4, trackW, 5, 2.5).fill(COLORS.band);
+    const ratio = max > 0 ? Math.max(0, Math.min(1, Number(value) / max)) : 0;
+    if (ratio > 0) {
+      doc.roundedRect(trackX, y + 2.4, Math.max(3, trackW * ratio), 5, 2.5).fill(tone);
+    }
+    line(rightText, MARGIN + CONTENT_W * 0.60, y, {
+      font: F.bold, size: 7.4, color: tone, width: CONTENT_W * 0.40, align: 'right',
+    });
+    y += 13;
+    inked = true;
+  };
+
+  /**
+   * Grouped bar-chart block (investment mix, owner collection). The whole
+   * block is reserved up front so its heading can never be orphaned at the
+   * foot of a page.
+   */
+  const shareChart = (title, rows) => {
+    const usable = rows.filter((r) => Number.isFinite(Number(r.value)));
+    if (!usable.length) return;
+    const max = Math.max(...usable.map((r) => Math.abs(Number(r.value))), 1);
+    need(21 + usable.length * 13);
+    y += 7;
+    line(title, MARGIN, y, { font: F.bold, size: 6.8, color: COLORS.muted, width: CONTENT_W });
+    y += 11;
+    usable.forEach((r) => shareBar(r.label, r.value, max, r.color, r.rightText));
+    y += 3;
+    inked = true;
+  };
+
+  /**
+   * Stage-wise progress: the nine construction stages tracked on the site
+   * document, two per row, each with its own mini bar. Skipped entirely when
+   * no stage has been updated, so a fresh site does not print nine empty bars.
+   */
+  const stageGrid = (progress) => {
+    const stages = [
+      ['foundation', 'Foundation'], ['plinth', 'Plinth'], ['structure', 'Structure'],
+      ['brickwork', 'Brickwork'], ['electrical', 'Electrical'], ['plumbing', 'Plumbing'],
+      ['flooring', 'Flooring'], ['painting', 'Painting'], ['finishing', 'Finishing'],
+    ];
+    const values = stages.map(([key, label]) => [
+      label,
+      Math.max(0, Math.min(100, Number(progress && progress[key]) || 0)),
+    ]);
+    if (!values.some(([, value]) => value > 0)) return;
+    section(null, 'Progress by Stage');
+    const gap = 16;
+    const cellW = (CONTENT_W - gap) / 2;
+    const cellH = 24;
+    const rowCount = Math.ceil(values.length / 2);
+    need(rowCount * cellH + 4);
+    values.forEach(([label, value], index) => {
+      const cx = MARGIN + (index % 2) * (cellW + gap);
+      const cy = y + Math.floor(index / 2) * cellH;
+      const tone = value >= 100 ? COLORS.success : value >= 50 ? COLORS.primary : COLORS.sky;
+      line(label, cx, cy, { font: F.bold, size: 7.4, color: COLORS.navy, width: cellW - 40 });
+      line(`${value}%`, cx + cellW - 40, cy, {
+        font: F.bold, size: 7.4, color: tone, width: 40, align: 'right',
+      });
+      doc.roundedRect(cx, cy + 12, cellW, 5, 2.5).fill(COLORS.band);
+      if (value > 0) doc.roundedRect(cx, cy + 12, Math.max(3, cellW * (value / 100)), 5, 2.5).fill(tone);
+    });
+    y += rowCount * cellH + 4;
     inked = true;
   };
 
@@ -522,7 +614,11 @@ const buildSiteReportPdf = (data) => {
   }
 
   // Progress bar for the site (stage-aware percentages live on the site doc).
+  y += 8;
   progressBar('Overall project progress', data.overallProgress);
+
+  // The nine construction stages behind the overall figure, when recorded.
+  stageGrid(site.progress);
 
   // ============================================================== CONTENTS
   section(null, 'Contents');
@@ -591,6 +687,35 @@ const buildSiteReportPdf = (data) => {
     }
   );
 
+  // Two bar charts turn the same figures into an at-a-glance read: where the
+  // money is going (cost mix) and how much of the owner's value is collected.
+  const shareOfProject = (value) =>
+    s.projectValue ? `${((Number(value) / Number(s.projectValue)) * 100).toFixed(1)}%` : '-';
+  if (Number(s.totalInvestment) > 0) {
+    shareChart('INVESTMENT COMPOSITION', [
+      ['Material cost', s.materialCost, COLORS.primary],
+      ['Labour / worker cost', s.workerCost, COLORS.sky],
+      ['Vendor cost (not linked to a material)', s.vendorCost, COLORS.amber],
+      ['Other site expenses', s.otherExpenses, COLORS.muted],
+    ].map(([label, value, color]) => ({
+      label,
+      value: Number(value) || 0,
+      color,
+      rightText: `${money(value)}   (${shareOf(value)})`,
+    })));
+  }
+  if (Number(s.projectValue) > 0) {
+    shareChart('OWNER COLLECTION AGAINST PROJECT VALUE', [
+      ['Received from owner', s.totalReceived, COLORS.success],
+      ['Pending receivable', s.pendingReceivable, COLORS.warning],
+    ].map(([label, value, color]) => ({
+      label,
+      value: Number(value) || 0,
+      color,
+      rightText: `${money(value)}   (${shareOfProject(value)})`,
+    })));
+  }
+
   // ================================================================= SECTION 3
   if (installments.length) {
     const dues = installments.reduce((acc, i) => acc + (Number(i.amount) || 0), 0);
@@ -624,6 +749,7 @@ const buildSiteReportPdf = (data) => {
       }),
       {
         totals: ['', 'TOTAL', money(dues), money(paid), money(Math.max(0, dues - paid)), '', ''],
+        tones: { 5: statusColorFor },
       }
     );
   }
@@ -684,6 +810,43 @@ const buildSiteReportPdf = (data) => {
         note: `${workers.length} worker(s) on the muster roll. Days worked and amounts are rolled up from the worker payment register.`,
       }
     );
+
+    // Individual payout transactions - the same rows the Excel workbook prints
+    // on its "Worker Payments" sheet, so the PDF and the workbook agree.
+    if (workerPayments.length) {
+      const ledgerDue = workerPayments.reduce((acc, wp) => acc + (Number(wp.totalAmount) || 0), 0);
+      const ledgerPaid = workerPayments.reduce((acc, wp) => acc + (Number(wp.paidAmount) || 0), 0);
+      const ledgerDays = workerPayments.reduce((acc, wp) => acc + (Number(wp.workDays) || 0), 0);
+      section(null, 'Labour Payment Ledger');
+      table(
+        cols([
+          [2, 'Date'],
+          [3.6, 'Worker'],
+          [1.6, 'Days', 'right'],
+          [2.4, 'Amount', 'right'],
+          [2.2, 'Paid', 'right'],
+          [2.2, 'Balance', 'right'],
+          [2, 'Mode'],
+        ]),
+        workerPayments.map((wp) => [
+          formatDate(wp.date),
+          wp.worker?.name || wp.workerName,
+          plain(wp.workDays),
+          money(wp.totalAmount),
+          money(wp.paidAmount),
+          money(Math.max(0, (Number(wp.totalAmount) || 0) - (Number(wp.paidAmount) || 0))),
+          wp.paymentMode,
+        ]),
+        {
+          totals: [
+            'TOTAL', '', plain(ledgerDays),
+            money(ledgerDue), money(ledgerPaid),
+            money(Math.max(0, ledgerDue - ledgerPaid)), '',
+          ],
+          note: `${workerPayments.length} payout entr${workerPayments.length === 1 ? 'y' : 'ies'}, newest first. The per-worker totals above are rolled up from these entries.`,
+        }
+      );
+    }
   }
 
   // ================================================================= SECTION 6
@@ -745,7 +908,7 @@ const buildSiteReportPdf = (data) => {
         money(m.pendingAmount),
       ]),
       {
-        totals: ['TOTAL PURCHASES', '', '', '', '', money(purchaseTotal), money(purchasePaid), money(Math.max(0, purchaseTotal - purchasePaid))],
+        totals: ['TOTAL', '', '', '', '', money(purchaseTotal), money(purchasePaid), money(Math.max(0, purchaseTotal - purchasePaid))],
         note: 'Category, invoice number and payment status for every purchase line are included in the Excel/CSV export.',
       }
     );
@@ -867,7 +1030,7 @@ const buildSiteReportPdf = (data) => {
         vp.notes,
       ]),
       {
-        totals: ['TOTAL CASH PAID', '', '', '', money(vendorCash), '', '', ''],
+        totals: ['TOTAL', '', '', '', money(vendorCash), '', '', ''],
         note: 'Cash actually disbursed to vendors. A payment may be recorded against a material line or as a general vendor settlement.',
       }
     );
@@ -901,13 +1064,14 @@ const buildSiteReportPdf = (data) => {
       ]),
       {
         totals: [
-          'TOTAL EXPENSES', '', '',
+          'TOTAL', '', '',
           money(expenseTotal),
           money(expensePaid),
           money(Math.max(0, expenseTotal - expensePaid)),
           '', '',
         ],
         note: 'Site overheads outside material purchases and labour - transport, equipment hire, permits and similar running costs.',
+        tones: { 6: statusColorFor },
       }
     );
   }
@@ -987,7 +1151,9 @@ const buildSiteReportPdf = (data) => {
   // ============================================================== DECLARATION
   // A dossier filed as a permanent site record closes with the control block
   // the industry expects: what the figures mean, who prepared it, and where the
-  // wet signatures and stamp go.
+  // wet signatures and stamp go. The whole block is reserved as one unit so the
+  // signature boxes can never be orphaned onto a page of their own.
+  need(130);
   rule(COLORS.line, 0.8, 12);
   y += 7;
   line('DECLARATION', MARGIN, y, { font: F.bold, size: 8, color: COLORS.navy });
