@@ -14,6 +14,7 @@ const { buildMaterialPdf } = require('../reports/materialReport');
 const { buildMaterialPeriodPdf, titleFor } = require('../reports/materialPeriodReport');
 const { buildMaterialPeriodWorkbook, buildMaterialPeriodCsv } = require('../exports/materialPeriodExport');
 const { buildSiteWorkbook } = require('../exports/excelExport');
+const { buildSiteCsv, CSV_TYPES } = require('../exports/csvExport');
 const { safeFileSlug, toIsoDate, buildReportFilename } = require('../utils/format');
 
 /**
@@ -245,12 +246,18 @@ const getSitePdfReport = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/sites/:siteId/export/excel
- * Streams a multi-sheet .xlsx workbook for the site.
+ * Sends a multi-sheet .xlsx workbook for the site.
+ *
+ * The workbook is rendered to a Buffer first (not streamed) so Content-Length
+ * is known up front - the browser can then size the download, and a generation
+ * failure can still be reported as a normal JSON error instead of corrupting
+ * an already-started binary response.
  */
 const exportExcel = asyncHandler(async (req, res) => {
   const { site, data } = await loadReportData(req);
 
   const workbook = await buildSiteWorkbook(data, data.engineer);
+  const buffer = await workbook.xlsx.writeBuffer();
 
   const filename = buildReportFilename('Financial Report', site.siteName, 'xlsx');
 
@@ -258,10 +265,10 @@ const exportExcel = asyncHandler(async (req, res) => {
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );
+  res.setHeader('Content-Length', buffer.length);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-  await workbook.xlsx.write(res);
-  res.end();
+  res.status(200).send(Buffer.from(buffer));
 });
 
 /**
@@ -271,186 +278,14 @@ const exportExcel = asyncHandler(async (req, res) => {
  * GET /api/sites/:siteId/export/csv?type=payments
  *
  * Supported types:
- *   site | payments | installments | workers | worker-payments |
- *   materials | vendors | vendor-payments | expenses | summary | complete
+ *   site | summary | payments | installments | workers | worker-payments |
+ *   materials | vendors | vendor-payments | expenses | activities |
+ *   progress | documents | complete
  *
  * Comma separated types are combined into one downloadable file; "complete"
- * emits every dataset (the Complete Site Report).
+ * emits every dataset (the Complete Site Report) as ONE rectangular table
+ * with a leading "Section" column - real CSV, parseable by any tool.
  */
-
-/** RFC-4180 safe cell: quotes are doubled and the value wrapped when needed. */
-const csvCell = (value) => {
-  if (value === null || value === undefined) return '""';
-  const text = String(value);
-  if (/[",\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-};
-
-/** Builds a CSV block from a title, a header row and data rows. */
-const csvSection = (title, headers, rows) => {
-  const lines = [`# ${title}`, headers.map(csvCell).join(',')];
-  rows.forEach((row) => lines.push(row.map(csvCell).join(',')));
-  return lines.join('\r\n');
-};
-
-const num = (value) => (Number(value) || 0).toFixed(2);
-
-/** Each builder maps the assembled report payload to CSV sections. */
-const CSV_BUILDERS = {
-  site: (data) => [
-    csvSection(
-      'Site Information',
-      ['Field', 'Value'],
-      [
-        ['Site Name', data.site.siteName],
-        ['Owner Name', data.site.ownerName],
-        ['Owner Mobile', data.site.ownerMobile],
-        ['Address', data.site.address],
-        ['City', data.site.city],
-        ['State', data.site.state],
-        ['Status', data.site.status],
-        ['Area', `${data.site.totalArea} ${data.site.areaUnit || 'Sq.Ft'}`],
-        ['Rate', num(data.site.ratePerArea)],
-        ['Project Value', num(data.summary.projectValue)],
-        ['Start Date', toIsoDate(data.site.startDate)],
-        ['Expected Completion', toIsoDate(data.site.expectedCompletionDate)],
-        ['Overall Progress %', data.site.overallProgress || 0],
-        ['Engineer', data.engineer.name],
-        ['Company', data.engineer.company],
-      ]
-    ),
-  ],
-
-  summary: (data) => {
-    const s = data.summary;
-    return [
-      csvSection(
-        'Investment & Profit',
-        // Units are stated in the header so the column is self-describing when
-        // this CSV is opened cold in Excel or Google Sheets.
-        ['Head', 'Amount (INR)'],
-        [
-          ['Project Value (INR)', num(s.projectValue)],
-          ['Total Received (INR)', num(s.totalReceived)],
-          ['Pending Receivable (INR)', num(s.pendingReceivable)],
-          ['Material Cost (INR)', num(s.materialCost)],
-          ['Worker Cost (INR)', num(s.workerCost)],
-          ['Vendor Cost (INR)', num(s.vendorCost)],
-          ['Other Expenses (INR)', num(s.otherExpenses)],
-          ['Total Investment Committed (INR)', num(s.totalInvestment)],
-          ['Investment Paid (INR)', num(s.totalPaid)],
-          ['Outstanding Payable (INR)', num(s.outstandingPayable)],
-          ['Estimated Profit (INR)', num(s.estimatedProfit)],
-          ['Profit Margin (%)', num(s.profitMargin)],
-        ]
-      ),
-    ];
-  },
-
-  payments: (data) => [
-    csvSection(
-      'Payments Received',
-      ['Date', 'Amount', 'Mode', 'Reference', 'Notes'],
-      data.payments.map((p) => [
-        toIsoDate(p.date), num(p.amount), p.paymentMode,
-        p.transactionRef || '', p.notes || '',
-      ])
-    ),
-  ],
-
-  installments: (data) => [
-    csvSection(
-      'Installments',
-      ['Order', 'Name', 'Amount', 'Paid', 'Pending', 'Due Date', 'Payment Date', 'Mode', 'Status'],
-      data.installments.map((i) => [
-        i.order,
-        i.name,
-        num(i.amount),
-        num(i.paidAmount),
-        num(Math.max(0, (i.amount || 0) - (i.paidAmount || 0))),
-        toIsoDate(i.dueDate),
-        toIsoDate(i.paymentDate),
-        i.paymentMode || '',
-        i.status,
-      ])
-    ),
-  ],
-
-  workers: (data) => [
-    csvSection(
-      'Workers',
-      ['Name', 'Mobile', 'Type', 'Daily Wage', 'Work Days', 'Total Amount', 'Paid', 'Pending', 'Joining Date', 'Status'],
-      data.workers.map((w) => [
-        w.name, w.mobile, w.workerType, num(w.dailyWage), w.totalWorkDays,
-        num(w.totalAmount), num(w.paidAmount), num(w.pendingAmount),
-        toIsoDate(w.joiningDate), w.status,
-      ])
-    ),
-  ],
-
-  'worker-payments': (data) => [
-    csvSection(
-      'Worker Payments',
-      ['Date', 'Worker', 'Work Days', 'Daily Wage', 'Total', 'Paid', 'Pending', 'Status', 'Payment Date', 'Mode'],
-      data.workerPayments.map((wp) => [
-        toIsoDate(wp.date), wp.worker?.name || '', wp.workDays, num(wp.dailyWage),
-        num(wp.totalAmount), num(wp.paidAmount), num(wp.pendingAmount), wp.status,
-        toIsoDate(wp.paymentDate), wp.paymentMode || '',
-      ])
-    ),
-  ],
-
-  materials: (data) => [
-    csvSection(
-      'Materials',
-      ['Purchase Date', 'Material', 'Category', 'Vendor', 'Quantity', 'Unit', 'Rate', 'Total', 'Paid', 'Pending', 'Invoice', 'Status'],
-      data.materials.map((m) => [
-        toIsoDate(m.purchaseDate), m.name, m.category,
-        m.vendor?.name || m.vendorName || '', m.quantity, m.unit, num(m.rate),
-        num(m.totalAmount), num(m.paidAmount), num(m.pendingAmount),
-        m.invoiceNumber || '', m.paymentStatus,
-      ])
-    ),
-  ],
-
-  vendors: (data) => [
-    csvSection(
-      'Vendors',
-      ['Name', 'Mobile', 'Email', 'City', 'Category', 'Materials', 'Total Purchases', 'Paid', 'Pending'],
-      data.vendors.map((v) => [
-        v.name, v.mobile || '', v.email || '', v.city || '', v.materialCategory || '',
-        v.materialCount, num(v.totalPurchases), num(v.paidAmount), num(v.pendingAmount),
-      ])
-    ),
-  ],
-
-  'vendor-payments': (data) => [
-    csvSection(
-      'Vendor Payments',
-      ['Date', 'Vendor', 'Material', 'Quantity', 'Unit', 'Amount', 'Mode', 'Reference', 'Notes'],
-      data.vendorPayments.map((vp) => [
-        toIsoDate(vp.date), vp.vendor?.name || '',
-        vp.material?.name || vp.materialName || '', vp.quantity || '', vp.unit || '',
-        num(vp.amount), vp.paymentMode || '', vp.transactionRef || '', vp.notes || '',
-      ])
-    ),
-  ],
-
-  expenses: (data) => [
-    csvSection(
-      'Site Expenses',
-      ['Date', 'Category', 'Description', 'Amount', 'Paid', 'Pending', 'Status', 'Mode'],
-      data.expenses.map((e) => [
-        toIsoDate(e.expenseDate), e.category, e.description, num(e.amount),
-        num(e.paidAmount), num(e.pendingAmount), e.paymentStatus, e.paymentMode || '',
-      ])
-    ),
-  ],
-};
-
-const CSV_TYPES = Object.keys(CSV_BUILDERS);
 
 /**
  * GET /api/sites/:siteId/export/csv
@@ -477,19 +312,10 @@ const exportCsv = asyncHandler(async (req, res) => {
     );
   }
 
-  const blocks = types.flatMap((type) => CSV_BUILDERS[type](data));
-
-  const header = [
-    '# CivilSiteMitra - Site Project Report',
-    `# Site: ${site.siteName}`,
-    `# Owner: ${site.ownerName}`,
-    `# Engineer: ${data.engineer.name}`,
-    `# Generated: ${toIsoDate(data.generatedAt)}`,
-    '',
-  ].join('\r\n');
-
-  // The BOM makes Excel open the file as UTF-8 (needed for the rupee symbol).
-  const csv = `\uFEFF${header}${blocks.join('\r\n\r\n')}\r\n`;
+  // Rectangular CSV (UTF-8 BOM + RFC-4180 escaping) built by csvExport.js:
+  // one dataset -> its own narrow table; several/complete -> a single unified
+  // table where every row has the same column count.
+  const csv = buildSiteCsv(data, types);
 
   // A single-dataset export is named after that dataset; the full bundle is the
   // "Site Data" report. Both follow CivilSiteMitra_<Kind>_<Site>_<Date>.csv.
@@ -499,6 +325,7 @@ const exportCsv = asyncHandler(async (req, res) => {
   const filename = buildReportFilename(kind, site.siteName, 'csv');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.status(200).send(csv);
 });

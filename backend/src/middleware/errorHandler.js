@@ -64,6 +64,15 @@ const errorHandler = (err, req, res, next) => {
     err = new ApiError('Database is temporarily unreachable. Please try again in a few seconds.', 503);
   }
 
+  // Binary responses (PDF/Excel/CSV) are sent progressively via pipe/res.end().
+  // If the failure happens AFTER headers went out, appending JSON would corrupt
+  // the download (Excel "unreadable content"). Destroy the socket instead so
+  // the client sees an aborted transfer, never mixed bytes.
+  if (res.headersSent) {
+    res.destroy(err);
+    return;
+  }
+
   // Send response
   res.status(err.statusCode).json({
     success: false,

@@ -176,71 +176,123 @@ const cell = (value) => {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
-const section = (title, headers, rows) => {
-  const lines = [`# ${title}`, headers.map(cell).join(',')];
-  rows.forEach((r) => lines.push(r.map(cell).join(',')));
-  return lines.join('\r\n');
+/**
+ * Unified column set for the period CSV. ONE rectangular table (exactly like
+ * the site CSV): every physical row has the same width, so Excel / Sheets /
+ * pandas can parse the file directly. A leading "Section" column says which
+ * dataset each row belongs to; "Value" carries report-info / label text.
+ */
+const PERIOD_HEADERS = [
+  'Section',
+  'Date',
+  'Name',
+  'Category / Type',
+  'Vendor / Party',
+  'Purchased Qty',
+  'Used Qty',
+  'Balance',
+  'Unit',
+  'Rate (INR)',
+  'Amount (INR)',
+  'Paid (INR)',
+  'Outstanding (INR)',
+  'Invoice No',
+  'Work / Activity',
+  'Notes',
+  'Value',
+];
+
+/** Column indexes so the row builders below stay readable. */
+const P = Object.fromEntries(PERIOD_HEADERS.map((header, index) => [header, index]));
+
+/** Builds one unified row: section label + sparse {header: value} cells. */
+const prow = (section, cells = {}) => {
+  const row = Array(PERIOD_HEADERS.length).fill('');
+  row[P.Section] = section;
+  for (const [header, value] of Object.entries(cells)) {
+    row[P[header]] = value ?? '';
+  }
+  return row;
 };
+
+/** INR text with 2 decimals (never "Rs. 5,000"). */
+const money2 = (value) => (Number(value) || 0).toFixed(2);
 
 /** CSV twin of the workbook, built from the same rollup. */
 const buildMaterialPeriodCsv = (data, opts = {}) => {
   const { rollup, purchases, usages, vendors, totals, period } = data;
   const site = opts.site || data.site || {};
 
-  const header = [
-    '# CivilSiteMitra - Material Purchase & Usage Report',
-    `# Period: ${period.label}`,
-    `# From: ${period.from || 'start'}   To: ${period.to || 'latest'}`,
-    `# Site: ${site.siteName || ''}`,
-    `# Owner: ${site.ownerName || ''}`,
-    `# Engineer: ${(opts.engineer && opts.engineer.name) || site.engineerName || ''}`,
-    `# Generated: ${new Date().toISOString().slice(0, 10)}`,
-    '',
-  ].join('\r\n');
+  const rows = [
+    // Report metadata (was a `#` comment banner; now parseable data rows).
+    prow('Report Info', { Name: 'Report Type', Value: period.type }),
+    prow('Report Info', { Name: 'Period', Value: period.label }),
+    prow('Report Info', { Name: 'Period From', Value: period.from || '' }),
+    prow('Report Info', { Name: 'Period To', Value: period.to || '' }),
+    prow('Report Info', { Name: 'Site Name', Value: site.siteName || '' }),
+    prow('Report Info', { Name: 'Owner', Value: site.ownerName || '' }),
+    prow('Report Info', {
+      Name: 'Engineer',
+      Value: (opts.engineer && opts.engineer.name) || site.engineerName || '',
+    }),
+    prow('Report Info', { Name: 'Generated', Value: new Date().toISOString().slice(0, 10) }),
 
-  const blocks = [
-    section(
-      'Material Summary',
-      ['Material', 'Category', 'Unit', 'Purchased Qty', 'Used Qty', 'Balance Qty',
-        'Purchase Amount (INR)', 'Paid (INR)', 'Outstanding (INR)'],
-      rollup.map((r) => [r.name, r.category || '', r.unit || '', num(r.purchased), num(r.used),
-        balanceText(r), num(r.amount), num(r.paid), num(r.pending)]),
-    ),
-    section(
-      'Purchase Details',
-      ['Date', 'Material', 'Vendor', 'Invoice No', 'Quantity', 'Unit', 'Rate (INR)',
-        'Amount (INR)', 'Paid (INR)', 'Outstanding (INR)'],
-      purchases.map((p) => [iso(p.purchaseDate), p.name, vendorOf(p), p.invoiceNumber || '',
-        num(p.quantity), p.unit || '', num(p.rate), num(p.totalAmount),
-        num(p.paidAmount), num(p.pendingAmount)]),
-    ),
-    section(
-      'Usage Details',
-      ['Date', 'Material', 'Unit', 'Quantity Used', 'Work / Activity', 'Notes'],
-      usages.map((u) => [iso(u.date), u.materialName || '', u.unit || '', num(u.quantity),
-        u.workActivity || '', u.notes || '']),
-    ),
-    section(
-      'Vendor Purchase Summary',
-      ['Vendor', 'Material', 'Quantity', 'Unit', 'Amount (INR)'],
-      vendors.flatMap((v) => v.rows.map((r) => [v.vendor, r.material, num(r.quantity), r.unit || '', num(r.amount)])),
-    ),
-    section(
-      'Total Summary',
-      ['Field', 'Value'],
-      [
-        ['Total Purchase Amount (INR)', num(totals.totalPurchaseAmount)],
-        ['Total Paid (INR)', num(totals.totalPaid)],
-        ['Total Outstanding (INR)', num(totals.totalPending)],
-        ['Total Materials Purchased', num(totals.totalQuantityPurchased)],
-        ['Total Materials Used', num(totals.totalQuantityUsed)],
-        ['Balance', totals.balanceAvailable ? num(totals.totalBalance) : 'Balance not available'],
-      ],
-    ),
+    ...rollup.map((r) => prow('Material Summary', {
+      Name: r.name,
+      'Category / Type': r.category || '',
+      Unit: r.unit || '',
+      'Purchased Qty': num(r.purchased),
+      'Used Qty': num(r.used),
+      Balance: balanceText(r),
+      'Amount (INR)': money2(r.amount),
+      'Paid (INR)': money2(r.paid),
+      'Outstanding (INR)': money2(r.pending),
+    })),
+
+    ...purchases.map((p) => prow('Purchase Details', {
+      Date: iso(p.purchaseDate),
+      Name: p.name,
+      'Vendor / Party': vendorOf(p),
+      'Invoice No': p.invoiceNumber || '',
+      'Purchased Qty': num(p.quantity),
+      Unit: p.unit || '',
+      'Rate (INR)': money2(p.rate),
+      'Amount (INR)': money2(p.totalAmount),
+      'Paid (INR)': money2(p.paidAmount),
+      'Outstanding (INR)': money2(p.pendingAmount),
+    })),
+
+    ...usages.map((u) => prow('Usage Details', {
+      Date: iso(u.date),
+      Name: u.materialName || '',
+      'Used Qty': num(u.quantity),
+      Unit: u.unit || '',
+      'Work / Activity': u.workActivity || '',
+      Notes: u.notes || '',
+    })),
+
+    ...vendors.flatMap((v) => v.rows.map((r) => prow('Vendor Purchase Summary', {
+      'Vendor / Party': v.vendor,
+      Name: r.material,
+      'Purchased Qty': num(r.quantity),
+      Unit: r.unit || '',
+      'Amount (INR)': money2(r.amount),
+    }))),
+
+    prow('Total Summary', { Name: 'Total Purchase Amount (INR)', 'Amount (INR)': money2(totals.totalPurchaseAmount) }),
+    prow('Total Summary', { Name: 'Total Paid (INR)', 'Amount (INR)': money2(totals.totalPaid) }),
+    prow('Total Summary', { Name: 'Total Outstanding (INR)', 'Amount (INR)': money2(totals.totalPending) }),
+    prow('Total Summary', { Name: 'Total Materials Purchased', 'Purchased Qty': num(totals.totalQuantityPurchased) }),
+    prow('Total Summary', { Name: 'Total Materials Used', 'Used Qty': num(totals.totalQuantityUsed) }),
+    prow('Total Summary', {
+      Name: 'Balance',
+      Balance: totals.balanceAvailable ? money2(totals.totalBalance) : 'Balance not available',
+    }),
   ];
 
-  // BOM so Excel opens the file as UTF-8 (needed for the rupee glyph).
-  return `\uFEFF${header}${blocks.join('\r\n\r\n')}\r\n`;
+  // BOM so Excel opens the file as UTF-8; CRLF + final newline per RFC-4180.
+  const text = [PERIOD_HEADERS, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+  return `\uFEFF${text}\r\n`;
 };
 
-module.exports = { buildMaterialPeriodWorkbook, buildMaterialPeriodCsv, balanceText };
+module.exports = { buildMaterialPeriodWorkbook, buildMaterialPeriodCsv, balanceText, PERIOD_HEADERS };

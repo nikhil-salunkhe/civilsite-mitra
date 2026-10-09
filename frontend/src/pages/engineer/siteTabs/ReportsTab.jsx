@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { money, dateFmt } from './shared';
+import { downloadFile } from '../../../utils/download';
 import MaterialPeriodCard from './MaterialPeriodCard';
 
 /**
@@ -173,18 +174,24 @@ const ReportsTab = ({ siteId }) => {
   const exportFile = async (format) => {
     setExporting(format);
     try {
-      const res = await api.get(`/sites/${siteId}/export/${format}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `site-report-${siteId}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      // downloadFile() uses the server's Content-Disposition filename, so the
+      // saved file gets the real extension (.xlsx). The fallback below only
+      // applies if that header is ever missing - it must NEVER be the old
+      // `site-report-<ObjectId>.excel`: `.excel` is not a real extension, and
+      // Windows opens such files with Word, which then reports the (perfectly
+      // valid) XLSX zip as "unreadable content".
+      const ext = format === 'excel' ? 'xlsx' : format;
+      const siteName = String(data?.site?.siteName || '')
+        .trim()
+        .replace(/[^\w-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      const today = new Date().toISOString().slice(0, 10);
+      const fallback = `civilsite-mitra-site-report-${siteName || siteId}-${today}.${ext}`;
+      await downloadFile(`/sites/${siteId}/export/${format}`, fallback);
       toast.success(`${format.toUpperCase()} exported`);
-    } catch {
-      toast.error(`Export failed`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Export failed');
     } finally {
       setExporting('');
     }

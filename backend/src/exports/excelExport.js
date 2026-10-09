@@ -242,6 +242,7 @@ const buildSiteWorkbook = async (data, engineerMeta = {}) => {
     { header: 'Mode', key: 'paymentMode', width: 14 },
     { header: 'Payment Date', key: 'paymentDate', width: 14 },
     { header: 'Status', key: 'status', width: 12 },
+    { header: 'Notes', key: 'notes', width: 30 },
   ];
   wkp.columns = wkpCols;
   workerPayments.forEach((row) => {
@@ -256,6 +257,7 @@ const buildSiteWorkbook = async (data, engineerMeta = {}) => {
       paymentMode: row.paymentMode,
       paymentDate: row.paymentDate ? new Date(row.paymentDate) : null,
       status: row.status,
+      notes: row.notes || '',
     });
   });
   setColumns(wkp, wkpCols);
@@ -537,6 +539,61 @@ const buildSiteWorkbook = async (data, engineerMeta = {}) => {
     if (typeof cell.value === 'number') cell.numFmt = MONEY_FMT;
   });
   pf.getRow(4).font = { bold: true, size: 11 };
+
+  // ------------------------------------------------------ 13. PROGRESS
+  // Stage-wise completion (same numbers the PDF progress section prints).
+  const stageEntries = Object.entries(site.progress || {});
+  if (stageEntries.length) {
+    const pg = workbook.addWorksheet('Progress');
+    const pgCols = [
+      { header: 'Stage', key: 'stage', width: 24 },
+      { header: 'Progress (%)', key: 'pct', width: 14 },
+    ];
+    pg.columns = pgCols;
+    stageEntries.forEach(([stage, pct]) => {
+      const label = String(stage).replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      pg.addRow({ stage: label, pct: Number(pct) || 0 });
+    });
+    pg.addRow({
+      stage: 'OVERALL PROGRESS',
+      pct: Number(site.overallProgress) || 0,
+    });
+    setColumns(pg, pgCols);
+    pg.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      row.getCell(2).numFmt = '0"%"';
+    });
+    pg.getRow(pg.rowCount).font = { bold: true };
+    pg.getRow(pg.rowCount).eachCell((cell) => {
+      cell.fill = TOTAL_FILL;
+    });
+  }
+
+  // ---------------------------------------------------- 14. DOCUMENTS
+  // Uploaded files register (PDF includes the same list).
+  const documents = Array.isArray(data.documents) ? data.documents : [];
+  if (documents.length) {
+    const doc = workbook.addWorksheet('Documents');
+    const docCols = [
+      { header: 'Upload Date', key: 'uploadedDate', width: 16 },
+      { header: 'File Name', key: 'fileName', width: 40 },
+      { header: 'Type', key: 'fileType', width: 16 },
+      { header: 'Size (KB)', key: 'sizeKb', width: 12 },
+      { header: 'Notes', key: 'notes', width: 30 },
+    ];
+    doc.columns = docCols;
+    documents.forEach((d) => {
+      doc.addRow({
+        uploadedDate: d.uploadedDate ? new Date(d.uploadedDate) : null,
+        fileName: d.fileName || '',
+        fileType: d.fileType || '',
+        sizeKb: Math.round((Number(d.size) || 0) / 1024),
+        notes: d.notes || '',
+      });
+    });
+    setColumns(doc, docCols);
+    applyFormats(doc, docCols, [], ['uploadedDate']);
+  }
 
   return workbook;
 };

@@ -53,8 +53,17 @@ export const EngineerReports = () => {
       const path = format === 'pdf'
         ? `/sites/${site._id}/report/pdf`
         : `/sites/${site._id}/export/${format}`;
+      // Fallback only; downloadFile prefers the server's Content-Disposition
+      // filename. Must be a real extension - `.excel` files cannot be opened.
       const ext = format === 'excel' ? 'xlsx' : format;
-      await downloadFile(path, `site-report-${site._id}.${ext}`);
+      const siteName = String(site.siteName || '')
+        .trim()
+        .replace(/[^\w-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      const today = new Date().toISOString().slice(0, 10);
+      const fallback = `civilsite-mitra-site-report-${siteName || site._id}-${today}.${ext}`;
+      await downloadFile(path, fallback);
       toast.success(`${format.toUpperCase()} exported`);
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to export ${format.toUpperCase()}`);
