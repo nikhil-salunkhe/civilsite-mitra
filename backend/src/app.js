@@ -36,6 +36,12 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false,
+  // The frontend (often a different origin, e.g. Netlify) loads profile
+  // photos and document previews served from /uploads on the API host.
+  // Helmet's default Cross-Origin-Resource-Policy is "same-origin", which
+  // makes the browser reject those responses with
+  // ERR_BLOCKED_BY_RESPONSE.NotSameOrigin. Allow cross-origin resources.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Rate limiting
