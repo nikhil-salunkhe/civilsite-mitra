@@ -12,17 +12,15 @@ const {
 const { buildSiteReportPdf } = require('../reports/siteReport');
 const { buildMaterialPdf } = require('../reports/materialReport');
 const { buildMaterialPeriodPdf, titleFor } = require('../reports/materialPeriodReport');
-const { buildMaterialPeriodWorkbook, buildMaterialPeriodCsv } = require('../exports/materialPeriodExport');
-const { buildSiteWorkbook } = require('../exports/excelExport');
-const { buildSiteCsv, CSV_TYPES } = require('../exports/csvExport');
-const { safeFileSlug, toIsoDate, buildReportFilename } = require('../utils/format');
+const { toIsoDate, buildReportFilename } = require('../utils/format');
 
 /**
  * ---------------------------------------------------------------------------
- * Reports, PDF, Excel and CSV exports.
+ * Reports & the client-ready PDF dossier.
  * ---------------------------------------------------------------------------
- * All four outputs are fed by assembleSiteReportData(), which in turn uses the
- * central financialService - so screen, PDF, Excel and CSV always agree.
+ * The PDF is the single downloadable artefact: screen preview, PDF dossier and
+ * the per-material / period PDFs all read assembleSiteReportData(), which uses
+ * the central financialService - so every output always agrees.
  *
  * Ownership: every handler calls findOwnedSite() first. An engineer can only
  * ever export their own site; the Super Admin may export any site.
@@ -209,16 +207,7 @@ const getReports = asyncHandler(async (req, res) => {
       overallProgress: data.overallProgress,
       generatedAt: data.generatedAt,
       availableReports: [
-        { key: 'site', label: 'Site Report', format: 'pdf' },
-        { key: 'payments', label: 'Payment Report', format: 'csv' },
-        { key: 'installments', label: 'Installment Report', format: 'csv' },
-        { key: 'workers', label: 'Worker Report', format: 'csv' },
-        { key: 'materials', label: 'Material Report', format: 'csv' },
-        { key: 'vendors', label: 'Vendor Report', format: 'csv' },
-        { key: 'expenses', label: 'Expense Report', format: 'csv' },
-        { key: 'investment', label: 'Investment Report', format: 'excel' },
-        { key: 'profit', label: 'Profit Report', format: 'excel' },
-        { key: 'complete', label: 'Complete Site Report', format: 'excel' },
+        { key: 'site', label: 'Complete Site Report', format: 'pdf', path: `/sites/${data.site._id}/report/pdf` },
       ],
     },
   });
@@ -243,93 +232,6 @@ const getSitePdfReport = asyncHandler(async (req, res) => {
   const doc = buildSiteReportPdf(data);
   doc.pipe(res);
 });
-
-/**
- * GET /api/sites/:siteId/export/excel
- * Sends a multi-sheet .xlsx workbook for the site.
- *
- * The workbook is rendered to a Buffer first (not streamed) so Content-Length
- * is known up front - the browser can then size the download, and a generation
- * failure can still be reported as a normal JSON error instead of corrupting
- * an already-started binary response.
- */
-const exportExcel = asyncHandler(async (req, res) => {
-  const { site, data } = await loadReportData(req);
-
-  const workbook = await buildSiteWorkbook(data, data.engineer);
-  const buffer = await workbook.xlsx.writeBuffer();
-
-  const filename = buildReportFilename('Financial Report', site.siteName, 'xlsx');
-
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  );
-  res.setHeader('Content-Length', buffer.length);
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-  res.status(200).send(Buffer.from(buffer));
-});
-
-/**
- * ---------------------------------------------------------------------------
- * CSV EXPORT
- * ---------------------------------------------------------------------------
- * GET /api/sites/:siteId/export/csv?type=payments
- *
- * Supported types:
- *   site | summary | payments | installments | workers | worker-payments |
- *   materials | vendors | vendor-payments | expenses | activities |
- *   progress | documents | complete
- *
- * Comma separated types are combined into one downloadable file; "complete"
- * emits every dataset (the Complete Site Report) as ONE rectangular table
- * with a leading "Section" column - real CSV, parseable by any tool.
- */
-
-/**
- * GET /api/sites/:siteId/export/csv
- * ?type=payments            -> single dataset
- * ?type=payments,workers    -> multiple datasets in one file
- * ?type=complete (default)  -> every dataset (Complete Site Report)
- */
-const exportCsv = asyncHandler(async (req, res) => {
-  const { site, data } = await loadReportData(req);
-
-  const requested = String(req.query.type || 'complete')
-    .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  const types = requested.includes('complete')
-    ? CSV_TYPES
-    : requested.filter((type) => CSV_TYPES.includes(type));
-
-  if (types.length === 0) {
-    throw new ApiError(
-      `Unknown CSV type. Allowed values: ${CSV_TYPES.join(', ')}, complete`,
-      400
-    );
-  }
-
-  // Rectangular CSV (UTF-8 BOM + RFC-4180 escaping) built by csvExport.js:
-  // one dataset -> its own narrow table; several/complete -> a single unified
-  // table where every row has the same column count.
-  const csv = buildSiteCsv(data, types);
-
-  // A single-dataset export is named after that dataset; the full bundle is the
-  // "Site Data" report. Both follow CivilSiteMitra_<Kind>_<Site>_<Date>.csv.
-  const kind = requested.includes('complete') || types.length > 1
-    ? 'Site Data'
-    : `${types[0]} Data`;
-  const filename = buildReportFilename(kind, site.siteName, 'csv');
-
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Length', Buffer.byteLength(csv, 'utf8'));
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.status(200).send(csv);
-});
-
 
 /**
  * GET /api/sites/:siteId/reports/material-period
@@ -400,70 +302,10 @@ const getMaterialPeriodPreview = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * Shared helper for the two period-report exports. Loads the same rollup the
- * PDF uses, so Excel, CSV and PDF can never disagree for one period.
- */
-const loadPeriodReport = async (req) => {
-  const site = await findOwnedSite(req);
-  const period = resolvePeriod(req.query);
-  const data = await assembleMaterialPeriodData(site, {
-    from: period.from,
-    to: period.to,
-    type: period.type,
-    label: period.label,
-    material: req.query.material ? String(req.query.material).slice(0, 80) : null,
-    vendor: req.query.vendor ? String(req.query.vendor).slice(0, 80) : null,
-  });
-  await attachEngineer(site, data);
-  const scope = period.type === 'monthly' ? 'Monthly'
-    : period.type === 'weekly' ? 'Weekly' : 'Material';
-  return { site, data, filename: buildReportFilename(`${scope} Material Report`, site.siteName, 'xlsx') };
-};
-
-/**
- * GET /api/sites/:siteId/reports/material-period/excel
- * Same period, same rollup, five worksheets (Summary / Material Summary /
- * Purchases / Usage / Vendor Summary) with frozen headers, filters and real
- * numeric money cells.
- */
-const getMaterialPeriodExcel = asyncHandler(async (req, res) => {
-  const { site, data, filename } = await loadPeriodReport(req);
-  const wb = await buildMaterialPeriodWorkbook(data, { site, engineer: data.engineer });
-  const buffer = await wb.xlsx.writeBuffer();
-
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Length', buffer.byteLength);
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${filename.replace(/\.xlsx$/i, '.xlsx')}"`,
-  );
-  return res.send(Buffer.from(buffer));
-});
-
-/**
- * GET /api/sites/:siteId/reports/material-period/csv
- * UTF-8 (with BOM) so the rupee glyph and any Indian script survive Excel.
- */
-const getMaterialPeriodCsv = asyncHandler(async (req, res) => {
-  const { site, data } = await loadPeriodReport(req);
-  const csv = buildMaterialPeriodCsv(data, { site, engineer: data.engineer });
-  const scope = data.period.type === 'monthly' ? 'Monthly'
-    : data.period.type === 'weekly' ? 'Weekly' : 'Material';
-
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${buildReportFilename(`${scope} Material Data`, site.siteName, 'csv')}"`);
-  return res.status(200).send(csv);
-});
-
 module.exports = {
   getReports,
   getSitePdfReport,
-  exportExcel,
-  exportCsv,
   getMaterialPdfReport,
   getMaterialPeriodPdfReport,
   getMaterialPeriodPreview,
-  getMaterialPeriodExcel,
-  getMaterialPeriodCsv,
 };

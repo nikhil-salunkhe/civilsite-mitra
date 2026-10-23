@@ -55,7 +55,7 @@ module.exports = {
 
   superAdmin: {
     email: process.env.SUPER_ADMIN_EMAIL || 'admin@civilsitemitra.com',
-    password: process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456',
+    password: required('SUPER_ADMIN_PASSWORD', 'Admin@123456'),
   },
 
   clientUrl: optionalUrl('CLIENT_URL', 'http://localhost:5173'),

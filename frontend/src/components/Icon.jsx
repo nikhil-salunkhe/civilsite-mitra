@@ -60,7 +60,6 @@ const ICONS = {
   trash: Trash2,
   camera: Camera,
   download: Download,
-  loader: Loader2,
 };
 
 export const ICON_NAMES = Object.keys(ICONS);

@@ -747,8 +747,6 @@ async function main() {
 
     const exports = [
       ['PDF report', `/sites/${sid}/report/pdf`],
-      ['Excel export', `/sites/${sid}/export/excel`],
-      ['CSV export', `/sites/${sid}/export/csv`],
     ];
     for (const [label, path] of exports) {
       const res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${tokenA}` } });

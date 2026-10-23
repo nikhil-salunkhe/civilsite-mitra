@@ -164,8 +164,6 @@ const main = async () => {
     ['GET', `/sites/${siteB._id}/summary`, null],
     ['GET', `/sites/${siteB._id}/reports`, null],
     ['GET', `/sites/${siteB._id}/report/pdf`, null],
-    ['GET', `/sites/${siteB._id}/export/excel`, null],
-    ['GET', `/sites/${siteB._id}/export/csv`, null],
   ];
   for (const [method, path, body] of direct) {
     const r = await api(method, path, { token: tokenA, body });

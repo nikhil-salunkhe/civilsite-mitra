@@ -1,14 +1,12 @@
 /**
- * report-audit.js - generates the real PDF/XLSX/CSV and inspects the BYTES.
+ * report-audit.js - generates the real PDF and inspects the BYTES.
  *
  * report-check.js only proves HTTP 200 + MIME type. This inspects actual
  * content for the defects a client would notice: leaked [object Object] /
- * NaN / undefined, Mongo internals in CSV, bad filenames, a missing company
- * contact block in the PDF, and corrupt Excel cells.
+ * NaN / undefined, bad filenames, a missing company contact block in the PDF.
  */
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
 const zlib = require('zlib');
 
 const BASE = process.env.BASE || 'http://localhost:5000/api';
@@ -51,44 +49,6 @@ const run = async () => {
   const site = list[0];
   const sid = site._id;
   ok('audit target', `site "${site.siteName}"`);
-
-  // ---- CSV -----------------------------------------------------------
-  const csv = await req(`/sites/${sid}/export/csv?type=complete`, true);
-  const text = csv.buf.toString('utf8');
-  fs.writeFileSync(path.join(OUT, 'report.csv'), csv.buf);
-  const csvName = fileName(csv.headers);
-  ok('CSV downloaded', `${csv.buf.length} bytes`);
-  ok('CSV filename', csvName);
-  ok('CSV filename convention', /^CivilSiteMitra_.*\.csv$/.test(csvName) ? 'matches CivilSiteMitra_*.csv' : 'DOES NOT match CivilSiteMitra_*.csv');
-  ok('CSV BOM', text.charCodeAt(0) === 0xFEFF ? 'present (Excel-safe)' : 'MISSING');
-
-  const badCsv = ['[object Object]', 'NaN', 'Infinity'].filter((t) => text.includes(t));
-  if (badCsv.length) bad('CSV bad values', badCsv.join(', ')); else ok('CSV bad values', 'none');
-
-  const lines = text.split(/\r?\n/);
-  const leaks = ['_id', '__v', 'engineerId', 'siteId']
-    .filter((f) => lines.some((l) => new RegExp(`(^|,)"?${f}"?(,|$)`).test(l)));
-  if (leaks.length) bad('CSV internal fields', leaks.join(', ')); else ok('CSV internal fields', 'none leaked');
-
-  const unbalanced = lines.filter((l) => l && (l.match(/"/g) || []).length % 2 !== 0);
-  if (unbalanced.length) bad('CSV quoting', `${unbalanced.length} unbalanced lines`); else ok('CSV quoting', 'balanced');
-
-  // ---- Excel ---------------------------------------------------------
-  const xl = await req(`/sites/${sid}/export/excel`, true);
-  const xlsxPath = path.join(OUT, 'report.xlsx');
-  fs.writeFileSync(xlsxPath, xl.buf);
-  const xlName = fileName(xl.headers);
-  ok('Excel downloaded', `${xl.buf.length} bytes`);
-  ok('Excel filename', xlName);
-  ok('Excel filename convention', /^CivilSiteMitra_.*\.xlsx$/.test(xlName) ? 'matches CivilSiteMitra_*.xlsx' : 'DOES NOT match CivilSiteMitra_*.xlsx');
-
-  const zip = execFileSync('tar', ['-tf', xlsxPath], { encoding: 'utf8' });
-  const sheets = zip.split(/\r?\n/).filter((f) => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
-  ok('Excel worksheets', `${sheets.length}`);
-  let xml = '';
-  for (const f of sheets.slice(0, 5)) xml += execFileSync('tar', ['-xOf', xlsxPath, f], { encoding: 'utf8', maxBuffer: 1 << 26 });
-  const badXl = ['[object Object]', '#REF!', '#VALUE!', 'NaN', 'Infinity'].filter((t) => xml.includes(t));
-  if (badXl.length) bad('Excel bad cells', badXl.join(', ')); else ok('Excel bad cells', 'none');
 
   // ---- PDF -----------------------------------------------------------
   const pdf = await req(`/sites/${sid}/report/pdf`, true);

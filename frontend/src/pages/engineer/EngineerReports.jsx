@@ -7,8 +7,7 @@ import { downloadFile } from '../../utils/download';
 
 /**
  * Engineer-wide Reports page (spec STEP 38 sidebar). Portfolio financial
- * summary from /sites/summary plus per-site PDF/Excel/CSV exports using the
- * same endpoints as the site Reports tab.
+ * summary from /sites/summary plus per-site PDF export.
  */
 export const EngineerReports = () => {
   const [summary, setSummary] = useState(null);
@@ -18,7 +17,7 @@ export const EngineerReports = () => {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({});
-  const [busy, setBusy] = useState('');
+  const [exporting, setExporting] = useState('');
   // A failed portfolio call used to render five silent zeros, which looks like
   // "you earned nothing" instead of "we could not load it".
   const [summaryError, setSummaryError] = useState('');
@@ -45,30 +44,23 @@ export const EngineerReports = () => {
 
   const f = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
-  const exportFile = async (site, format) => {
-    const key = `${site._id}-${format}`;
-    setBusy(key);
+  const exportPdf = async (site) => {
+    setExporting(`${site._id}-pdf`);
     try {
-      // PDF lives at /report/pdf while Excel/CSV live at /export/*.
-      const path = format === 'pdf'
-        ? `/sites/${site._id}/report/pdf`
-        : `/sites/${site._id}/export/${format}`;
-      // Fallback only; downloadFile prefers the server's Content-Disposition
-      // filename. Must be a real extension - `.excel` files cannot be opened.
-      const ext = format === 'excel' ? 'xlsx' : format;
+      const path = `/sites/${site._id}/reports/material-period?type=all`;
       const siteName = String(site.siteName || '')
         .trim()
         .replace(/[^\w-]+/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
       const today = new Date().toISOString().slice(0, 10);
-      const fallback = `civilsite-mitra-site-report-${siteName || site._id}-${today}.${ext}`;
+      const fallback = `civilsite-mitra-site-material-report-${siteName || site._id}-${today}.pdf`;
       await downloadFile(path, fallback);
-      toast.success(`${format.toUpperCase()} exported`);
+      toast.success('Material Purchase & Usage PDF exported');
     } catch (err) {
-      toast.error(err.response?.data?.message || `Failed to export ${format.toUpperCase()}`);
+      toast.error(err.response?.data?.message || 'Failed to export PDF');
     } finally {
-      setBusy('');
+      setExporting('');
     }
   };
 
@@ -82,7 +74,7 @@ export const EngineerReports = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" subtitle="Portfolio summary and site exports" />
+      <PageHeader title="Reports" subtitle="Portfolio summary and site report" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {cards.map((c) => (
@@ -144,28 +136,14 @@ export const EngineerReports = () => {
                     <td><StatusBadge status={site.status} /></td>
                     <td className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button type="button" 
-                          className="btn btn-secondary btn-sm"
-                          disabled={busy === `${site._id}-pdf`}
-                          onClick={() => exportFile(site, 'pdf')}
-                        >
-                          {busy === `${site._id}-pdf` ? '...' : 'PDF'}
-                        </button>
-                        <button type="button" 
-                          className="btn btn-secondary btn-sm"
-                          disabled={busy === `${site._id}-excel`}
-                          onClick={() => exportFile(site, 'excel')}
-                        >
-                          {busy === `${site._id}-excel` ? '...' : 'Excel'}
-                        </button>
-                        <button type="button" 
-                          className="btn btn-secondary btn-sm"
-                          disabled={busy === `${site._id}-csv`}
-                          onClick={() => exportFile(site, 'csv')}
-                        >
-                          {busy === `${site._id}-csv` ? '...' : 'CSV'}
-                        </button>
-                      </div>
+  <button type="button"
+    className="btn btn-secondary btn-sm"
+    disabled={exporting === `${site._id}-pdf`}
+    onClick={() => exportPdf(site)}
+  >
+    {exporting === `${site._id}-pdf` ? '...' : 'PDF'}
+  </button>
+</div>
                     </td>
                   </tr>
                 ))}

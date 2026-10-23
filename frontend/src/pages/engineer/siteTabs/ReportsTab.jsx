@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { money, dateFmt } from './shared';
-import { downloadFile } from '../../../utils/download';
 import MaterialPeriodCard from './MaterialPeriodCard';
 
 /**
  * Reports tab - the site's permanent record, standardised for engineers:
- * the screen preview, the A4 PDF (print / file / submit), the Excel workbook
- * and the CSV bundle all show the SAME numbered sections in the SAME order:
+ * the screen preview and the A4 PDF dossier (print / file / submit) show the
+ * SAME numbered sections in the SAME order:
  *   1. Project Particulars (site • owner • engineer • contract value)
  *   2. Financial Summary (contract / investment / cash / profit)
  *   3. Owner Collection (installment schedule + receipts)
@@ -19,8 +18,8 @@ import MaterialPeriodCard from './MaterialPeriodCard';
  *   8. Other Expenses
  *   9. Daily Work Diary (recent activities)
  *  10. Documents Register (file index)
- * Data comes from GET /api/sites/:siteId/reports. Exports come from
- * GET /api/sites/:siteId/report/pdf, .../export/excel and .../export/csv.
+ * Data comes from GET /api/sites/:siteId/reports. The dossier comes from
+ * GET /api/sites/:siteId/report/pdf (preview + download).
  */
 // Keys must match calculateSiteFinancialSummary in the backend financial
 // service - a missing key means the card silently disappears. The groups render
@@ -61,7 +60,7 @@ const CARD_GROUPS = [
 /**
  * Numbered document index - mirrors SITE_REPORT_SECTIONS from
  * backend/src/reports/reportSchema.js (the single source of truth also used by
- * the PDF, Excel and CSV exports). The API supplies the same list with live
+ * the PDF export). The API supplies the same list with live
  * record counters in meta.sections; this fallback keeps the numbering visible
  * even if meta is missing.
  */
@@ -97,7 +96,7 @@ const SectionIndex = ({ meta }) => {
         </span>
       </div>
       <p className="text-xs text-gray-500 mb-3">
-        Scope: {meta?.scope || 'Entire project (all records)'} — the PDF, Excel and CSV exports
+        Scope: {meta?.scope || 'Entire project (all records)'} — the PDF export
         use this exact numbering, so this site&rsquo;s record can be filed and referenced by
         section number.
       </p>
@@ -171,31 +170,6 @@ const ReportsTab = ({ siteId }) => {
     loadReport();
   }, [loadReport]);
 
-  const exportFile = async (format) => {
-    setExporting(format);
-    try {
-      // downloadFile() uses the server's Content-Disposition filename, so the
-      // saved file gets the real extension (.xlsx). The fallback below only
-      // applies if that header is ever missing - it must NEVER be the old
-      // `site-report-<ObjectId>.excel`: `.excel` is not a real extension, and
-      // Windows opens such files with Word, which then reports the (perfectly
-      // valid) XLSX zip as "unreadable content".
-      const ext = format === 'excel' ? 'xlsx' : format;
-      const siteName = String(data?.site?.siteName || '')
-        .trim()
-        .replace(/[^\w-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-      const today = new Date().toISOString().slice(0, 10);
-      const fallback = `civilsite-mitra-site-report-${siteName || siteId}-${today}.${ext}`;
-      await downloadFile(`/sites/${siteId}/export/${format}`, fallback);
-      toast.success(`${format.toUpperCase()} exported`);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Export failed');
-    } finally {
-      setExporting('');
-    }
-  };
 
   // Opens the A4 PDF in a new tab for on-screen preview (spec section 35).
   const previewPdf = async () => {
@@ -291,19 +265,12 @@ const ReportsTab = ({ siteId }) => {
           <button type="button" className="btn btn-primary btn-sm" disabled={exporting === 'pdf'} onClick={previewPdf}>
             {exporting === 'pdf' ? 'Loading...' : 'Preview / Print PDF'}
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" disabled={exporting === 'excel'} onClick={() => exportFile('excel')}>
-            {exporting === 'excel' ? 'Exporting...' : 'Excel Record'}
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm" disabled={exporting === 'csv'} onClick={() => exportFile('csv')}>
-            {exporting === 'csv' ? 'Exporting...' : 'CSV Record'}
-          </button>
         </div>
       </div>
 
       <SectionIndex meta={pickObj(data, ['meta']) || pickObj(data?.data, ['meta'])} />
 
-      {/* Weekly / monthly / custom material purchases and consumption, in
-          PDF, Excel and CSV - all from the same server-side rollup. */}
+      {/* Material period rollup - weekly, monthly or custom; PDF only. */}
       <MaterialPeriodCard siteId={siteId} />
 
       {summary && typeof summary === 'object' && (

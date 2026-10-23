@@ -30,3 +30,10 @@ server.log
 
 # Generated report previews (backend/tools/pdf-preview.mjs)
 backend/.preview/
+
+# Generated export previews + local probe/scratch scripts (backend/.export-preview/)
+backend/.export-preview/
+
+# Large archive artifacts
+*.zip
+backend.zip

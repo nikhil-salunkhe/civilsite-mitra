@@ -34,8 +34,6 @@ const BASE = 'http://localhost:5000/api';
   };
 
   await hit(`/sites/${sid}/report/pdf`, 'application/pdf', '%PDF-', 'PDF report');
-  await hit(`/sites/${sid}/export/excel`, 'spreadsheet', 'PK', 'Excel export (.xlsx)');
-  await hit(`/sites/${sid}/export/csv`, 'text/csv', null, 'CSV export');
   await hit(`/sites/${sid}/reports`, 'application/json', null, 'Reports JSON payload');
 
   // The JSON bundle must carry the standard dossier metadata: the canonical

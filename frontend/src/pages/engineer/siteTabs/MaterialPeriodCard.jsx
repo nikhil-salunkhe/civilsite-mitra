@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../../context/AuthContext';
 import { toast } from 'react-toastify';
-import { downloadFile } from '../../../utils/download';
 import { money, dateFmt } from './shared';
 
 /**
@@ -12,8 +11,6 @@ import { money, dateFmt } from './shared';
  *   monthly -> ?type=monthly&month=YYYY-MM (whole calendar month)
  *   custom  -> ?from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * PDF, Excel and CSV all come from the same server-side rollup, so the totals
- * shown here are exactly the totals written into the downloaded file.
  */
 const nowIso = () => new Date().toISOString().slice(0, 10);
 
@@ -81,20 +78,7 @@ const MaterialPeriodCard = ({ siteId }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const exportAs = async (format, filename) => {
-    setBusy(format);
-    try {
-      await downloadFile(
-        `/sites/${siteId}/reports/material-period/${format}?${query}`,
-        filename,
-      );
-      toast.success(`${format.toUpperCase()} downloaded`);
-    } catch (err) {
-      toast.error(err.response?.data?.message || `${format.toUpperCase()} download failed`);
-    } finally {
-      setBusy('');
-    }
-  };
+
 
   const openPdf = async () => {
     setBusy('pdf');
@@ -121,7 +105,7 @@ return (
         <h3 className="font-semibold text-gray-900">Material Purchase &amp; Usage Report</h3>
         <p className="text-xs text-gray-500 mt-0.5">
           Weekly, monthly or custom period — purchases, consumption, balance and vendor totals.
-          PDF, Excel and CSV all use the same figures.
+          PDF is the only download.
         </p>
       </div>
 
@@ -283,31 +267,14 @@ return (
           </>
         )}
 
-        {/* ---- downloads ---- */}
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="btn btn-secondary btn-sm"
+            disabled={busy === 'pdf'}
             onClick={openPdf}
-            disabled={!valid || loading || busy === 'pdf'}
           >
-            {busy === 'pdf' ? 'Opening...' : 'Preview / Print PDF'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => exportAs('excel', `material-period-${stamp}.xlsx`)}
-            disabled={!valid || loading || busy === 'excel'}
-          >
-            {busy === 'excel' ? 'Exporting...' : 'Export Excel'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => exportAs('csv', `material-period-${stamp}.csv`)}
-            disabled={!valid || loading || busy === 'csv'}
-          >
-            {busy === 'csv' ? 'Exporting...' : 'Export CSV'}
+            {busy === 'pdf' ? 'Downloading...' : 'Download Material Purchase &amp; Usage PDF'}
           </button>
         </div>
       </div>

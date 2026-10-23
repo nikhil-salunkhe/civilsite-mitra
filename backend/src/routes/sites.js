@@ -160,8 +160,6 @@ router.delete('/:siteId/documents/:id', deleteDocument);
 // Reports & exports
 router.get('/:siteId/reports', reportController.getReports);
 router.get('/:siteId/report/pdf', reportController.getSitePdfReport);
-router.get('/:siteId/export/excel', reportController.exportExcel);
-router.get('/:siteId/export/csv', reportController.exportCsv);
 // Per-material PDF (complete history of one material) - declared after the
 // generic /reports route so it can never be shadowed by it.
 router.get(
@@ -176,15 +174,6 @@ router.get(
 router.get(
   '/:siteId/reports/material-period/preview',
   reportController.getMaterialPeriodPreview,
-);
-// Same period and same rollup as the PDF, in Excel and CSV.
-router.get(
-  '/:siteId/reports/material-period/excel',
-  reportController.getMaterialPeriodExcel,
-);
-router.get(
-  '/:siteId/reports/material-period/csv',
-  reportController.getMaterialPeriodCsv,
 );
 
 module.exports = router;
