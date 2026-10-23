@@ -36,7 +36,7 @@ const run = async () => {
   console.log(`Connected to database "${mongoose.connection.name}"`);
 
   const email = (config.superAdmin?.email || 'admin@civilsitemitra.com').toLowerCase().trim();
-  const password = config.superAdmin?.password || 'Admin@123456';
+  const password = config.superAdmin?.password;
 
   const existing = await User.findOne({ email }).select('+password');
 

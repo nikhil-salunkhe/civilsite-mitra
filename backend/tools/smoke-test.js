@@ -1,8 +1,9 @@
 /* CivilSiteMitra E2E smoke test — self-healing: creates its own fixtures,
  * runs all checks, then cleans up. Requires MongoDB + API on port 5000. */
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const BASE = process.env.API_URL || 'http://localhost:5000/api';
 const ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@civilsitemitra.com';
-const ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Admin@123456';
+const ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 
 const RUN_ID = Date.now().toString(36);
 // Mobiles must differ per run: an interrupted run leaves fixtures behind and the

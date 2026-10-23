@@ -208,7 +208,7 @@ node tools/smoke-test.js
 
 Manual walkthrough (both servers are currently running):
 
-1. **Admin** — sign in at http://localhost:5173 as `admin@civilsitemitra.com` / `Admin@123456` (values from `backend/.env`).
+1. **Admin** — sign in at http://localhost:5173 using the Super Admin credentials from `backend/.env` (`SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`).
    Dashboard → **Engineers** (create / edit / status / reset password / delete) → **Engineer detail** → **All Sites** → **Audit Logs** → **My Profile** (edit details + upload a photo) → **Settings** (change password).
 2. **Engineer** — create one from *Engineers → Create Engineer*, note the temporary password, then sign in as that engineer: the app forces a password change first (**Settings**), then Dashboard → My Sites → New Site → open the site and exercise all **10 tabs** (Overview, Payments, Installments, Workers, Materials, Vendors, Expenses, Activities, Reports, Documents) → **Profile** (details + photo) → site **Mark Complete / Reopen / Archive / Restore / Delete**.
 

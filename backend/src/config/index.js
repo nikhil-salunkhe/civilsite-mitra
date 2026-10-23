@@ -45,17 +45,17 @@ module.exports = {
   isProduction: IS_PROD,
 
   // Required in production. No localhost fallback can survive a container deploy.
-  mongoUri: required('MONGO_URI', 'mongodb://localhost:27017/civilsite-mitra'),
+  mongoUri: required('MONGO_URI'),
 
   jwt: {
-    secret: required('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production'),
+    secret: required('JWT_SECRET'),
     expire: process.env.JWT_EXPIRE || '7d',
     refreshExpire: process.env.JWT_REFRESH_EXPIRE || '30d',
   },
 
   superAdmin: {
     email: process.env.SUPER_ADMIN_EMAIL || 'admin@civilsitemitra.com',
-    password: required('SUPER_ADMIN_PASSWORD', 'Admin@123456'),
+    password: required('SUPER_ADMIN_PASSWORD'),
   },
 
   clientUrl: optionalUrl('CLIENT_URL', 'http://localhost:5173'),

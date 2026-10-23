@@ -100,7 +100,7 @@ npm run dev                 # Vite on http://localhost:5173 (proxies /api to :50
 
 | Role | Email | Password |
 |---|---|---|
-| Super Admin | `admin@civilsitemitra.com` | `Admin@123456` |
+| Super Admin | `admin@civilsitemitra.com` | `<set in backend/.env>` |
 
 Values come from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` in `backend/.env`. **Change them before any real deployment.** Engineers do not self-register — the Super Admin creates their accounts and issues temporary passwords (first login forces a password change).
 
@@ -115,7 +115,7 @@ Values come from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` in `backend/.env`.
 | `MONGO_URI` | MongoDB connection | `mongodb://localhost:27017/civilsite-mitra` |
 | `JWT_SECRET` | token signing | *(must change in production)* |
 | `JWT_EXPIRE` | access token lifetime | `7d` |
-| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` | seed admin login | `admin@civilsitemitra.com` / `Admin@123456` |
+| `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` | seed admin login | `admin@civilsitemitra.com` / `<set a strong password>` |
 | `CLIENT_URL` / `SERVER_URL` | CORS origins | `http://localhost:5173` / `http://localhost:5000` |
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | general API budget per IP | `900000` / `2000` |
 | `RATE_LIMIT_AUTH_MAX` | failed credential attempts per window | `20` |
